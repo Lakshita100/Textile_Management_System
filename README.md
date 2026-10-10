@@ -34,16 +34,18 @@ A centralized web application for textile factories that connects raw material a
 
 ## Current Status
 
-This repository is at the **initial scaffold stage**:
+**Feature 02 (Production & Machine Tracking) is implemented and verified** — platform foundation, backend API, PostgreSQL migrations, React frontend, and tests:
 
 | Area | Status |
 |---|---|
 | Repository structure (`backend/`, `frontend/`, `docs/`) | Created |
 | Backend configuration (`app/config.py`, `app/database.py`, `.env.example`) | Created |
-| Database models & Alembic migrations | Not implemented yet |
-| FastAPI app, routers, recommendation service | Not implemented yet |
-| React application | Not implemented yet |
-| Seed data, tests | Not implemented yet |
+| FastAPI app (`/api/v1`, health, CORS, error handling) | Implemented and verified |
+| Database models & Alembic migrations (6 Feature 02 tables) | Implemented and verified (`909cc08f3f36`) |
+| Machine / production / recommendation / analytics services & routers | Implemented and verified |
+| React application (Dashboard, Machines, Jobs, Recommendations, Analytics) | Implemented and verified |
+| Seed data (labeled fixtures), tests | 29 backend tests + 3 frontend tests passing |
+| Modules 01/03/04 (Maahi/Anand/Ram), Auth/RBAC | Not implemented — labeled FIXTURE adapters in use |
 
 The approved global theme and design tokens are version-controlled at [`frontend/src/styles/theme.css`](frontend/src/styles/theme.css) and [`frontend/src/styles/global.css`](frontend/src/styles/global.css); never invent a new brand palette.
 
@@ -66,25 +68,28 @@ Lakshita also owns the **platform foundation** required for Feature 02 (FastAPI 
 textile-manufacturing/
 ├── backend/
 │   ├── app/
-│   │   ├── api/            # FastAPI routers (planned)
-│   │   ├── models/         # SQLAlchemy models (planned)
-│   │   ├── schemas/        # Pydantic schemas (planned)
-│   │   ├── crud/           # CRUD operations (planned)
-│   │   ├── services/       # Business logic incl. machine recommendation (planned)
+│   │   ├── api/            # FastAPI routers (health, machines, production, recommendations)
+│   │   ├── models/         # SQLAlchemy models (machines, jobs, events, recommendations)
+│   │   ├── schemas/        # Pydantic request/response schemas
+│   │   ├── crud/           # CRUD operations
+│   │   ├── services/       # Business logic incl. machine recommendation (rule-based)
+│   │   ├── adapters/       # Labeled FIXTURE adapters for other team modules
 │   │   ├── utils/          # QR and CSV/XLSX export utilities (planned)
-│   │   ├── tests/          # Backend tests (planned)
+│   │   ├── tests/          # Backend tests (29 passing)
 │   │   ├── config.py       # Settings via pydantic-settings
-│   │   └── database.py     # Engine and session factory
-│   ├── alembic/            # Database migrations (planned)
-│   ├── scripts/            # Seed and utility scripts (planned)
+│   │   ├── database.py     # Sync engine and session factory
+│   │   └── main.py         # FastAPI app entry point
+│   ├── alembic/            # Database migrations (initial Feature 02 migration)
+│   ├── scripts/            # Seed and utility scripts (seed_demo.py)
 │   ├── .env.example
 │   ├── pyproject.toml
 │   └── requirements.txt
 ├── frontend/
-│   ├── src/                # Components, pages, services, types (planned)
+│   ├── src/                # Pages, components, services, types, styles
 │   └── public/
-├── ai/                     # AI handoff pack: rules, architecture, theme tokens
-└── docs/                   # API contract and database schema documentation (planned)
+├── dataset/                # Candidate public dataset for optional ML phase (unused)
+├── ai/                     # Private AI working folder — local-only, git-ignored
+└── docs/                   # Architecture, plan, status, tracker, contracts
 ```
 
 ## Prerequisites
@@ -115,11 +120,13 @@ Create a PostgreSQL database and configure `DATABASE_URL` in `backend/.env`:
 CREATE DATABASE textile_manufacturing;
 ```
 
-Apply migrations once they exist:
+Apply migrations:
 
 ```bash
 cd backend
 alembic upgrade head
+# optional demo data (labeled DEVELOPMENT FIXTURES):
+python scripts/seed_demo.py
 ```
 
 ### 3. Run the Applications
@@ -131,12 +138,12 @@ cd backend
 uvicorn app.main:app --reload
 ```
 
-**Frontend** (once scaffolded):
+**Frontend**:
 
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev    # http://localhost:5173
 ```
 
 ## Testing
@@ -166,14 +173,14 @@ npm test
 
 Only `.env.example` files are committed. Copy them to `.env` (backend) or `.env.local` (frontend) and fill in real values. Real secrets are never committed.
 
-- `backend/.env.example` — `DATABASE_URL`, `SECRET_KEY`, CORS origins, debug flag
-- Frontend env example will configure only the API base URL (e.g. `VITE_API_BASE_URL=http://localhost:8000/api/v1`). Database credentials are never exposed to the frontend.
+- `backend/.env.example` — `DATABASE_URL`, CORS origins, debug flag, recommendation weights
+- `frontend/.env.example` — API base URL only (e.g. `VITE_API_BASE_URL=http://localhost:8000/api/v1`). Database credentials are never exposed to the frontend.
 
 ## Security Notes
 
 - Keep secrets in environment variables; `.env` files are gitignored.
 - Inputs are validated on the backend (Pydantic).
-- Authentication, role-based access control, audit logs and backups are required before real deployment; the current scaffold only reserves configuration placeholders (`SECRET_KEY`, JWT settings).
+- Authentication, role-based access control, audit logs and backups are required before real deployment; they are not implemented yet (supervisor approval currently records the approver's name only).
 
 ## License
 

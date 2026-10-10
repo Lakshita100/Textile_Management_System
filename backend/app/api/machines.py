@@ -1,0 +1,150 @@
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.models.machine import Machine, MachineStatus, MachineStatusEvent
+from app.models.production import ProductionJob, ProductionJobStatus
+from app.schemas.common import Page
+from app.schemas.machine import (
+    CurrentAssignmentOut,
+    MachineCreate,
+    MachineDetailOut,
+    MachineListOut,
+    MachineOut,
+    MachineStatusChange,
+    MachineStatusEventOut,
+    MachineUpdate,
+)
+from app.services import machines as machine_service
+from app.services.machines import MachineRuleError
+
+router = APIRouter(prefix="/machines", tags=["machines"])
+
+
+def _assignment_out(job: ProductionJob) -> CurrentAssignmentOut:
+    return CurrentAssignmentOut(
+        job_id=job.id,
+        order_ref=job.order_ref,
+        material_spec=job.material_spec,
+        required_process=job.required_process,
+        planned_quantity=job.planned_quantity,
+        actual_quantity=job.actual_quantity,
+        quantity_unit=job.quantity_unit,
+        status=job.status.value,
+        completion_percent=job.completion_percent,
+        planned_start=job.planned_start,
+        planned_end=job.planned_end,
+    )
+
+
+@router.get("", response_model=Page[MachineListOut])
+def list_machines(
+    search: str | None = None,
+    status: MachineStatus | None = None,
+    process: str | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    q = select(Machine)
+    if search:
+        like = f"%{search.strip()}%"
+        q = q.where((Machine.code.ilike(like)) | (Machine.name.ilike(like)))
+    if status:
+        q = q.where(Machine.status == status)
+    if process:
+        q = q.where(Machine.supported_processes.ilike(f"%{process.strip().upper()}%"))
+
+    total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
+    pages = max(1, (total + page_size - 1) // page_size)
+    rows = db.scalars(q.order_by(Machine.id).offset((page - 1) * page_size).limit(page_size)).all()
+
+    items = []
+    for m in rows:
+        active = machine_service.get_active_job(db, m.id)
+        eff = machine_service.completed_jobs_efficiency_percent(db, m.id)
+        items.append(
+            MachineListOut(
+                id=m.id,
+                code=m.code,
+                name=m.name,
+                machine_type=m.machine_type,
+                supported_processes=m.supported_processes,
+                capacity_value=m.capacity_value,
+                capacity_unit=m.capacity_unit,
+                status=m.status,
+                current_assignment=_assignment_out(active) if active else None,
+                available_for_assignment=machine_service.is_available_for_assignment(db, m),
+                efficiency_percent=eff,
+            )
+        )
+    return Page[MachineListOut](items=items, total=total, page=page, page_size=page_size, pages=pages)
+
+
+@router.post("", response_model=MachineOut, status_code=201)
+def create_machine(payload: MachineCreate, db: Session = Depends(get_db)):
+    exists = db.scalar(select(Machine).where(Machine.code == payload.code))
+    if exists:
+        raise HTTPException(409, f"Machine code '{payload.code}' already exists")
+    machine = Machine(**payload.model_dump())
+    db.add(machine)
+    db.flush()
+    db.add(
+        MachineStatusEvent(
+            machine_id=machine.id, from_status=None, to_status=machine.status, reason="Machine created"
+        )
+    )
+    db.commit()
+    db.refresh(machine)
+    return machine
+
+
+@router.get("/{machine_id}", response_model=MachineDetailOut)
+def machine_detail(machine_id: int, db: Session = Depends(get_db)):
+    m = machine_service.get_machine(db, machine_id)
+    if m is None:
+        raise HTTPException(404, f"Machine {machine_id} not found")
+    active = machine_service.get_active_job(db, m.id)
+    eff = machine_service.completed_jobs_efficiency_percent(db, m.id)
+    base = MachineOut.model_validate(m)
+    return MachineDetailOut(
+        **base.model_dump(),
+        current_assignment=_assignment_out(active) if active else None,
+        available_for_assignment=machine_service.is_available_for_assignment(db, m),
+    )
+
+
+@router.patch("/{machine_id}", response_model=MachineOut)
+def update_machine(machine_id: int, payload: MachineUpdate, db: Session = Depends(get_db)):
+    m = machine_service.get_machine(db, machine_id)
+    if m is None:
+        raise HTTPException(404, f"Machine {machine_id} not found")
+    for k, v in payload.model_dump(exclude_unset=True).items():
+        setattr(m, k, v)
+    db.commit()
+    db.refresh(m)
+    return m
+
+
+@router.patch("/{machine_id}/status", response_model=MachineOut)
+def change_status(machine_id: int, payload: MachineStatusChange, db: Session = Depends(get_db)):
+    m = machine_service.get_machine(db, machine_id)
+    if m is None:
+        raise HTTPException(404, f"Machine {machine_id} not found")
+    try:
+        return machine_service.change_machine_status(db, m, payload.status, payload.reason)
+    except MachineRuleError as e:
+        status = 409 if e.code in ("ILLEGAL_TRANSITION", "ACTIVE_JOB_EXISTS", "SAME_STATUS") else 422
+        raise HTTPException(status, {"detail": str(e), "code": e.code})
+
+
+@router.get("/{machine_id}/status-events", response_model=list[MachineStatusEventOut])
+def status_history(machine_id: int, db: Session = Depends(get_db)):
+    if machine_service.get_machine(db, machine_id) is None:
+        raise HTTPException(404, f"Machine {machine_id} not found")
+    return db.scalars(
+        select(MachineStatusEvent)
+        .where(MachineStatusEvent.machine_id == machine_id)
+        .order_by(MachineStatusEvent.created_at.desc())
+    ).all()
