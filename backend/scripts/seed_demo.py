@@ -102,6 +102,7 @@ def _seed_quality(db, jobs: dict[str, ProductionJob]) -> None:
         parsed = [{"type": t, "count": c, "severity": s} for t, c, s in defects]
         total = sum(p["count"] for p in parsed)
         outcome = override or (InspectionOutcome.APPROVED if total == 0 else InspectionOutcome.REWORK)
+        outcome_value = outcome.value if isinstance(outcome, InspectionOutcome) else outcome
         db.add(QualityInspection(
             job_id=job.id,
             roll_id=f"{batch_no}-R{roll_seq[job.id]}",
@@ -115,7 +116,7 @@ def _seed_quality(db, jobs: dict[str, ProductionJob]) -> None:
             accepted_qty_meters=float(max(0, inspected - total)),
             total_defect_count=total,
             defects=parsed,
-            outcome=outcome.value,
+            outcome=outcome_value,
             remarks=None,
             source="demo-seed",
         ))
