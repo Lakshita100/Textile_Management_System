@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.models.machine import Machine, MachineStatus
@@ -26,8 +26,38 @@ JOB_TRANSITIONS: dict[ProductionJobStatus, set[ProductionJobStatus]] = {
 }
 
 
+def _aware(dt: datetime | None) -> datetime | None:
+    """SQLite returns naive datetimes; normalize to UTC for safe comparison."""
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+# Application namespace for per-machine advisory locks (two-int key: ns + machine_id).
+MACHINE_LOCK_NAMESPACE = 741202
+
+
+def lock_machine(db: Session, machine_id: int) -> None:
+    """Serialize reservation decisions for one machine across concurrent workers.
+
+    Uses a transaction-level PostgreSQL advisory lock, held until the current
+    transaction commits or rolls back. Re-entrant within the same session, so
+    nested calls (e.g. approval -> create_job) are safe. Consistent order
+    (recommendation row lock, then machine lock) avoids deadlocks.
+
+    SQLite (unit tests) has no advisory locks — this is a no-op there; real
+    concurrency is verified against PostgreSQL separately.
+    """
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(
+            text("SELECT pg_advisory_xact_lock(:ns, :mid)"),
+            {"ns": MACHINE_LOCK_NAMESPACE, "mid": machine_id},
+        )
+
+
 def _overlaps(a_start: datetime | None, a_end: datetime | None, b_start: datetime | None, b_end: datetime | None) -> bool:
     """Half-open interval overlap; unbounded sides count as overlapping."""
+    a_start, a_end, b_start, b_end = _aware(a_start), _aware(a_end), _aware(b_start), _aware(b_end)
     if a_start is None or b_start is None:
         return True  # cannot prove disjoint → treat as conflict (conservative)
     if a_end is not None and b_start is not None and a_end <= b_start:
@@ -69,7 +99,13 @@ def create_job(
     shift: str | None = None,
     planned_start: datetime | None = None,
     planned_end: datetime | None = None,
+    commit: bool = True,
 ) -> ProductionJob:
+    # Serialize per-machine reservation decisions (TOCTOU guard): every check
+    # below and the insert must be atomic with respect to other workers.
+    # Re-entrant when the caller (e.g. recommendation approval) already holds it.
+    lock_machine(db, machine.id)
+
     if planned_quantity <= 0:
         raise MachineRuleError("planned_quantity must be positive", "INVALID_QUANTITY")
     if machine.status == MachineStatus.MAINTENANCE:
@@ -117,8 +153,9 @@ def create_job(
     db.add(job)
     db.flush()
     db.add(ProductionJobStatusEvent(job_id=job.id, from_status=None, to_status=ProductionJobStatus.PLANNED, note="Job created"))
-    db.commit()
-    db.refresh(job)
+    if commit:
+        db.commit()
+        db.refresh(job)
     return job
 
 

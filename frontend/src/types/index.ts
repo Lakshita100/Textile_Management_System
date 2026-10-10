@@ -116,6 +116,49 @@ export interface ScoreBreakdown {
   final_score: number;
 }
 
+export interface ScheduleOut {
+  setup_minutes: number;
+  processing_minutes: number;
+  processing_source: 'ml' | 'rule_capacity';
+  queue_wait_minutes: number;
+  earliest_start_at: string;
+  completion_at: string;
+  next_available_at: string;
+  idle_after_minutes: number | null;
+  deadline_feasible: boolean | null;
+  lateness_minutes: number | null;
+  assumptions: string[];
+  warnings: string[];
+}
+
+export interface DurationEstimateOut {
+  minutes: number;
+  source: string;
+  model_version: string | null;
+  warnings: string[];
+}
+
+export interface TimelineInterval {
+  kind: 'active_job' | 'planned_job';
+  job_id: number;
+  order_ref: string;
+  start: string;
+  end: string;
+  minutes: number;
+}
+
+export interface MachineTimelineOut {
+  machine_id: number;
+  machine_code: string;
+  now: string;
+  horizon_end: string;
+  busy_intervals: TimelineInterval[];
+  next_available_at: string;
+  open_downtime_count: number;
+  warnings: string[];
+  assumptions: string[];
+}
+
 export interface Candidate {
   machine_id: number;
   machine_code: string;
@@ -124,6 +167,9 @@ export interface Candidate {
   exclusion_reasons: string[];
   score: ScoreBreakdown | null;
   estimated_days: number | null;
+  schedule: ScheduleOut | null;
+  ml_selection_probability: number | null;
+  warnings: string[];
 }
 
 export interface Recommendation {

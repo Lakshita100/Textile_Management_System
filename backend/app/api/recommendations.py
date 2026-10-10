@@ -84,8 +84,19 @@ def generate_recommendation(payload: RecommendationRequest, db: Session = Depend
                     else None
                 ),
                 "estimated_days": c.estimated_days,
+                "schedule": c.schedule.as_dict() if c.schedule else None,
+                "ml_selection_probability": c.ml_selection_probability,
+                "warnings": c.warnings,
             }
         )
+
+    from app.services import allocation_ml as _allocation_ml
+
+    if _allocation_ml.model_available():
+        warnings = warnings + [
+            "Experimental ML selection probability attached to candidates (trained on synthetic heuristic "
+            "labels); it never overrides eligibility gates or the documented rule-based score ordering."
+        ]
 
     rec = MachineRecommendation(
         order_ref=payload.order_ref,
@@ -131,7 +142,9 @@ def approve_recommendation(recommendation_id: int, payload: ApprovalRequest, db:
     from app.models.machine import MachineStatus
     from app.services.production import detect_schedule_conflict
 
-    rec = db.get(MachineRecommendation, recommendation_id)
+    # Lock the recommendation row for the whole decision (PostgreSQL row lock;
+    # ignored on SQLite) so two workers cannot both pass the PENDING check.
+    rec = db.get(MachineRecommendation, recommendation_id, with_for_update=True)
     if rec is None:
         raise HTTPException(404, f"Recommendation {recommendation_id} not found")
     if rec.decision != RecommendationDecision.PENDING:
@@ -150,7 +163,12 @@ def approve_recommendation(recommendation_id: int, payload: ApprovalRequest, db:
     if machine is None:
         raise HTTPException(409, {"detail": "Recommended machine no longer exists", "code": "MACHINE_GONE"})
 
-    # --- Revalidation (transactional) ---
+    # Serialize with concurrent create/approve for this machine, then re-read
+    # state so the revalidation below cannot race another worker's insert.
+    production_service.lock_machine(db, machine.id)
+    db.refresh(machine)
+
+    # --- Revalidation (transactional, under machine lock) ---
     if machine.status == MachineStatus.MAINTENANCE:
         rec.decision = RecommendationDecision.FAILED_REVALIDATION
         rec.decided_by = payload.decided_by
@@ -174,7 +192,24 @@ def approve_recommendation(recommendation_id: int, payload: ApprovalRequest, db:
         db.commit()
         raise HTTPException(409, {"detail": f"Machine already has active job #{active.id}", "code": "MACHINE_BUSY"})
 
-    conflict = detect_schedule_conflict(db, machine.id, payload.planned_start, payload.planned_end)
+    # --- Resolve planned window: explicit payload times, else the computed schedule ---
+    from datetime import datetime as _dt
+
+    planned_start = payload.planned_start
+    planned_end = payload.planned_end
+    approved_schedule: dict | None = None
+    if planned_start is None or planned_end is None:
+        for c in (rec.payload or {}).get("candidates", []):
+            if c.get("machine_id") == machine_id and c.get("schedule"):
+                sched = c["schedule"]
+                if planned_start is None and sched.get("earliest_start_at"):
+                    planned_start = _dt.fromisoformat(sched["earliest_start_at"])
+                if planned_end is None and sched.get("completion_at"):
+                    planned_end = _dt.fromisoformat(sched["completion_at"])
+                approved_schedule = sched
+                break
+
+    conflict = detect_schedule_conflict(db, machine.id, planned_start, planned_end)
     if conflict is not None:
         rec.decision = RecommendationDecision.FAILED_REVALIDATION
         rec.decided_by = payload.decided_by
@@ -191,8 +226,11 @@ def approve_recommendation(recommendation_id: int, payload: ApprovalRequest, db:
             planned_quantity=rec.required_quantity,
             quantity_unit=rec.quantity_unit,
             shift=payload.shift,
-            planned_start=payload.planned_start,
-            planned_end=payload.planned_end,
+            planned_start=planned_start,
+            planned_end=planned_end,
+            # Stay in this transaction so the machine/recommendation locks are
+            # held until the APPROVED decision is committed (single atomic unit).
+            commit=False,
         )
     except MachineRuleError as e:
         rec.decision = RecommendationDecision.FAILED_REVALIDATION
@@ -207,6 +245,8 @@ def approve_recommendation(recommendation_id: int, payload: ApprovalRequest, db:
     rec.decided_at = datetime.now(timezone.utc)
     rec.decision_note = payload.note
     rec.assigned_job_id = job.id
+    if approved_schedule is not None:
+        rec.payload = {**(rec.payload or {}), "approved_schedule": approved_schedule}
     db.commit()
     db.refresh(rec)
     return _to_out(rec)

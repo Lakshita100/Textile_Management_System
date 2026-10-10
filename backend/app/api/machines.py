@@ -132,6 +132,14 @@ def change_status(machine_id: int, payload: MachineStatusChange, db: Session = D
     m = machine_service.get_machine(db, machine_id)
     if m is None:
         raise HTTPException(404, f"Machine {machine_id} not found")
+    # Serialize with job creation / recommendation approval for this machine:
+    # a status change (e.g. into MAINTENANCE) must not land between an
+    # approval's locked revalidation and its commit. Transaction-scoped
+    # advisory lock, held until change_machine_status commits; no-op on SQLite.
+    from app.services.production import lock_machine
+
+    lock_machine(db, m.id)
+    db.refresh(m)
     try:
         return machine_service.change_machine_status(db, m, payload.status, payload.reason)
     except MachineRuleError as e:

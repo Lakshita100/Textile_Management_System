@@ -1,13 +1,20 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { productionApi, machinesApi, apiErrorMessage } from '../services/api';
+import { getInspectionCounts } from '../services/qualityService';
 import type { Job, MachineListItem, Page } from '../types';
+import type { InspectionCount } from '../types/quality';
 import { EmptyState, ErrorAlert, Loading, PageHeader, ProgressBar, StatusBadge, SuccessAlert } from '../components/ui';
 
 const FILTERS = ['', 'PLANNED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'CANCELLED'];
+const INSPECTABLE_STATUSES = ['IN_PROGRESS', 'PAUSED', 'COMPLETED'];
 
 export default function JobsPage() {
+  const [searchParams] = useSearchParams();
+  const focusJob = Number(searchParams.get('job')) || null;
   const [data, setData] = useState<Page<Job> | null>(null);
   const [machines, setMachines] = useState<MachineListItem[]>([]);
+  const [quality, setQuality] = useState<Record<number, InspectionCount>>({});
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -22,10 +29,12 @@ export default function JobsPage() {
     Promise.all([
       productionApi.jobs({ status: status || undefined, page_size: 50 }),
       machinesApi.list({ page_size: 100 }),
+      getInspectionCounts().catch(() => ({}) as Record<number, InspectionCount>),
     ])
-      .then(([j, m]) => {
+      .then(([j, m, q]) => {
         setData(j);
         setMachines(m.items);
+        setQuality(q);
       })
       .catch((e) => setError(apiErrorMessage(e)))
       .finally(() => setLoading(false));
@@ -106,6 +115,13 @@ export default function JobsPage() {
         </select>
       </div>
 
+      {focusJob ? (
+        <div className="card mb-4 flex items-center justify-between gap-3 px-4 py-2 text-sm" role="status">
+          <span>Linked from Quality: production job <span className="font-semibold">#{focusJob}</span></span>
+          <Link to={`/quality/inspections?job=${focusJob}`} className="font-medium text-action">View its inspections</Link>
+        </div>
+      ) : null}
+
       {loading ? (
         <Loading />
       ) : !data || data.items.length === 0 ? (
@@ -116,18 +132,39 @@ export default function JobsPage() {
             <thead>
               <tr className="table-header text-left">
                 <th className="p-3">#</th><th className="p-3">Order</th><th className="p-3">Machine</th>
-                <th className="p-3">Process</th><th className="p-3">Status</th>
+                <th className="p-3">Process</th><th className="p-3">Status</th><th className="p-3">Quality</th>
+                <th className="p-3">Planned window</th>
                 <th className="p-3 w-36">Progress</th><th className="p-3">Update qty</th><th className="p-3">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {data.items.map((j) => (
-                <tr key={j.id} className="border-t" style={{ borderColor: 'var(--color-border)' }}>
+              {data.items.map((j) => {
+                const inspected = quality[j.id]?.count ?? 0;
+                const canInspect = INSPECTABLE_STATUSES.includes(j.status) && j.actual_quantity > 0;
+                return (
+                <tr key={j.id} className={`border-t ${focusJob === j.id ? 'bg-panel' : ''}`} style={{ borderColor: 'var(--color-border)' }}>
                   <td className="p-3">{j.id}</td>
                   <td className="p-3">{j.order_ref}</td>
                   <td className="p-3">#{j.machine_id}</td>
                   <td className="p-3">{j.required_process}</td>
                   <td className="p-3"><StatusBadge status={j.status} /></td>
+                  <td className="p-3 text-xs">
+                    {inspected > 0 ? (
+                      <Link to={`/quality/inspections?job=${j.id}`} className="text-action hover:underline">
+                        {inspected} inspection{inspected === 1 ? '' : 's'}
+                      </Link>
+                    ) : canInspect ? (
+                      <Link to={`/quality/inspections?job=${j.id}`} className="btn-secondary text-xs px-2 py-1">Inspect</Link>
+                    ) : (
+                      <span className="muted">-</span>
+                    )}
+                  </td>
+                  <td className="p-3 text-xs">
+                    {j.planned_start
+                      ? <>{new Date(j.planned_start).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          <div className="muted">→ {j.planned_end ? new Date(j.planned_end).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</div></>
+                      : <span className="muted">—</span>}
+                  </td>
                   <td className="p-3">
                     <ProgressBar percent={j.completion_percent} />
                     <span className="text-xs muted">{j.actual_quantity}/{j.planned_quantity} {j.quantity_unit}</span>
@@ -155,7 +192,8 @@ export default function JobsPage() {
                     {['PLANNED', 'IN_PROGRESS', 'PAUSED'].includes(j.status) && <button className="btn-secondary text-xs px-2 py-1" onClick={() => act(j, 'cancel')}>Cancel</button>}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

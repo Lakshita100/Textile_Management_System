@@ -1,7 +1,7 @@
 # Project Status — Source of Truth (shared)
 
-**Last repository audit:** 2026-10-10 (branch `main`, commit `8e70d98` at start of Feature 02 implementation sprint; this changeset contains the Feature 02 phases below).
-**Overall implementation status:** **Feature 02 (Production & Machine Tracking) implemented and verified — platform foundation, backend, frontend, tests. Team modules 01/03/04 not yet in this repository.**
+**Last repository audit:** 2026-10-10 (branch `main`, commit `0b1851f` = `origin/main` at start of the Feature 02 × Module 03 integration; this changeset contains that integration — index intentionally left clean/uncommitted pending approval).
+**Overall implementation status:** **Feature 02 (Production & Machine Tracking, incl. ML scheduling) + Module 03 quality backend/frontend integration implemented and verified end-to-end. Modules 01/04 not yet in this repository.**
 
 This file records only what has been inspected in the repository with evidence. Plans, mockups and generated-but-untested code are never counted as implemented.
 
@@ -25,6 +25,7 @@ This file records only what has been inspected in the repository with evidence. 
 - Dependency modules (Maahi/Anand/Ram) are still absent; Feature 02 consumes clearly-labeled **FIXTURE adapters** (`app/adapters/fixtures.py`) — never presented as live integrations.
 - Demo seed data (`backend/scripts/seed_demo.py`) is labeled DEVELOPMENT FIXTURES.
 - **Merge of `origin/anand` (Module 03 quality frontend, 2026-10-10):** branch based on `d9cd758` merged into `main` with 11 conflicts resolved — his `ai/` tracker edits kept local-only and ported into `docs/`; his frontend merged under `/quality` routes beside Feature 02's app; shared theme CSS identical on both branches. Post-merge: `npm run build` success (2277 modules), `npm test` 3 passed, `npm run lint` runs (2 pre-existing warnings).
+- **Feature 02 × Module 03 integration (2026-10-10):** persistent `quality_inspections` table (migration `b7f3d2c1a9e4`) + `/api/v1/quality/*` service/router replacing Anand's in-memory demo data; frontend qualityService rewritten API-backed; Jobs ↔ Quality cross-links; analytics defect rate and recommendation quality term now computed from persisted inspections (neutral-50 + explicit per-candidate warnings below 3 samples); per-machine advisory locking for scheduling under concurrency. Evidence: `python -m pytest -q` → **81 passed**; `npm test` → **10 passed**; build ✓; lint ✓ (2 pre-existing warnings); live server e2e → **37/37 checks** incl. 5× parallel double-approve/double-create at exactly one success each and a direct two-connection `pg_advisory_xact_lock` blocking proof; `alembic check` → no drift; dataset untouched/untracked; nothing staged or committed.
 
 ## Status matrix
 
@@ -34,30 +35,39 @@ This file records only what has been inspected in the repository with evidence. 
 | Shared documentation (`docs/`) | Created (Stage 0) | Architecture, plan, status, tracker, prerequisites, data sources, API contracts |
 | Approved theme / global CSS | Implemented and verified | `frontend/src/styles/theme.css` + `global.css`, imported by the running frontend; only approved tokens used |
 | Backend app shell (FastAPI `main.py`, CORS, `/api/v1`) | Implemented and verified | Health endpoints verified live; 500-handling verified |
-| Database models (Feature 02 schema) | Implemented and verified | 6 tables created via migration `909cc08f3f36` on PostgreSQL; SQLite for tests |
-| Alembic migrations | Implemented and verified | `alembic upgrade head` applied; sync-only engine (async path removed — `asyncpg` unavailable) |
+| Database models (Feature 02 + quality schema) | Implemented and verified | 7 tables via migrations `909cc08f3f36` + `b7f3d2c1a9e4` on PostgreSQL; SQLite for tests |
+| Alembic migrations | Implemented and verified | `alembic upgrade head` → `b7f3d2c1a9e4`; `alembic check` → no drift; sync-only engine (async path removed — `asyncpg` unavailable) |
 | Feature 02 — Machine Overview Dashboard | Implemented and verified | KPI cards, searchable/filterable table, detail + status history screens wired to live API |
 | Feature 02 — Current Machine Assignments | Implemented and verified (FIXTURE order refs) | Assignment model, conflict prevention, transitions validated by 29-test suite; Ram's `orders` not yet real |
 | Feature 02 — Production Quantity & Progress Tracking | Implemented and verified | Lifecycle transitions, overproduction/negative-quantity rejection, downtime records, dashboard KPIs |
 | Feature 02 — Machine Recommendation Engine | Implemented and verified | Rule-based scoring (0.40/0.35/0.25), eligibility gates before scoring, explanations, warnings, approval revalidation; live e2e verified |
-| Feature 02 — Performance & Quality-History Analytics | Implemented and verified (defect metric pending Anand) | `/production/analytics` returns per-machine output/efficiency/utilization/downtime; defect rate shown only from real quality data (none yet) |
+| Feature 02 — Performance & Quality-History Analytics | Implemented and verified | `/production/analytics` returns per-machine output/efficiency/utilization/downtime; defect rate computed from persisted `quality_inspections` within the date window, `null` + "not fabricated" note when history absent |
+| ML scheduling — duration model (`duration-v1`) | Implemented and verified (SYNTHETIC data) | Trained on `dataset/textile_production_scheduling_dataset/`; held-out MAE 18.42 min / R² 0.976; efficiency-adjusted throughput baseline is marginally better (17.65) on this corpus — rule fallback kept; serving degrades gracefully to capacity rule when artifact missing (`503 MODEL_UNAVAILABLE` on explicit estimate endpoint, rule fallback in recommendations) |
+| ML scheduling — allocation ranker (`allocation_rank-v1`) | Implemented and verified (experimental) | Held-out top-1 0.84 vs 0.60/0.56/0.42 heuristics; exposed only as `ml_selection_probability` — never overrides eligibility gates or rule scores; tagged experimental + synthetic-data warnings in API and UI |
+| Scheduling engine (setup/queue/idle/deadline) | Implemented and verified | 14-day horizon, 15-min setup default, busy-interval conflict logic aligned with approval revalidation; assumptions/warnings surfaced in API and UI; approval defaults job planned window from computed schedule and persists `approved_schedule` in payload |
+| Scheduling API | Implemented and verified | `POST /api/v1/scheduling/estimate-duration`, `GET /api/v1/scheduling/machines/{id}/timeline` with coded 404/422/503 errors — live-smoked |
+| Scheduling concurrency (multi-worker) | Implemented and verified | Per-machine `pg_advisory_xact_lock` (ns 741202) in `create_job`; approval revalidates under row lock + machine lock in one transaction; machine status changes take the same lock (approval-vs-status TOCTOU closed); live proof: 5× parallel double-approve/double-create → one success each; direct two-connection lock blocking test; SQLite path documented as no-op |
+| ML scheduling frontend | Implemented and verified | Recommend: schedule detail card, Processing/Start→Completion/ML P(select) columns (experimental label); MachineDetail: 14-day timeline + assumptions/warnings; Jobs: planned window column |
 | Module 01 Raw Materials (Maahi) | Not implemented | Material gate served by labeled FIXTURE adapter |
-| Module 03 Quality (Anand) | Frontend implemented (merged from `anand`) | Quality dashboard, All Inspections, modal inspection form, employee session switcher at `/quality`; build/lint verified by Anand and re-verified post-merge — **in-memory demo data only; backend wiring pending** |
+| Module 03 Quality — backend | Implemented and verified | `quality_inspections` (migration `b7f3d2c1a9e4`) + `/api/v1/quality/*`: eligibility, qty caps, cross-checks, server-derived batch/roll/outcome, disposition updates, dashboard, roll preview, inspectable job, per-job counts; coded 409/404 errors |
+| Module 03 Quality — frontend (Anand) | Implemented and verified (API-backed) | Dashboard, All Inspections, modal form at `/quality` now read/write the persistent API (no in-memory demo data); Jobs ↔ Quality cross-links; employee session switcher remains demo-only |
 | Module 04 Orders (Ram) | Not implemented | Order refs served by labeled FIXTURE adapter |
 | Modules 05/06 (Warehouse, Employees/Accounts) | Not implemented | Owners TBD |
 | Authentication / RBAC | Not implemented | Config placeholders removed pending design; supervisor approval currently records approver name only |
-| Backend tests | Implemented and verified | `python -m pytest -q` → 29 passed |
-| Frontend tests / build | Implemented and verified | `npm test` → 3 passed; `npm run build` → success (incl. merged quality module); `npm run lint` → oxlint active |
+| Backend tests | Implemented and verified | `python -m pytest -q` → **81 passed** (29 Feature 02 baseline + 32 ML/scheduling + 20 quality/concurrency) |
+| Frontend tests / build | Implemented and verified | `npm test` → **10 passed**; `npm run build` → success; `npm run lint` → oxlint 0 errors (2 pre-existing warnings) |
+| Live integration verification | Implemented and verified | uvicorn `:8000` + PostgreSQL: **37/37 checks** (e2e flow, coded error probes, dashboard from DB, parallel at-most-one-success, advisory-lock blocking proof, script-row-only cleanup) |
 | CI / deployment | Not implemented | Out of scope until MVP verified |
 
 ## Known risks
 
-1. **Feature 02 still depends on three modules (01/03/04) that do not exist in this repository.** FIXTURE adapters are labeled and swappable; contracts must be confirmed with Maahi, Anand and Ram before real integration (Phase 1 items remain open).
+1. **Feature 02 still depends on two modules (01/04) that do not exist in this repository; Module 03 is now integrated as a persistent backend.** FIXTURE adapters for inventory/orders are labeled and swappable; contracts must be confirmed with Maahi and Ram before real integration (Phase 1 items remain open).
 2. **Auth/RBAC is not implemented.** Supervisor approval persists the approver name but there is no identity/role enforcement yet — required before real deployment.
-3. Analytics defect-rate and recommendation quality-score depend on Anand's `quality_inspections`; until then they are neutral fallbacks with visible warnings. Anand's quality frontend now exists but stores data **in memory (resets on reload)** — inspection CRUD + machine-job endpoints must be built to replace the demo services.
+3. Analytics defect-rate and recommendation quality-score now read persisted `quality_inspections`; below 3 linked samples they show neutral-50 / `null` with explicit warnings (never fabricated). Anand's employee session switcher on the quality form is still demo-only (no auth).
 4. Demo/seed rows (DEVELOPMENT FIXTURES) and earlier manual test rows live in the local PostgreSQL database; a fresh clone must run `alembic upgrade head` (and optionally the seed script).
 5. Optional ML (Stage 7 / `dataset/ai4i2020.csv`) remains unapproved and unused by any running code.
-6. Frontend carries two module shells (Feature 02 `Layout` and quality `AppShell`) with separate navigation; cross-links added both ways (`/quality` ↔ `/`).
+7. **ML scheduling models are trained on SYNTHETIC data** (`dataset/textile_production_scheduling_dataset/`, seed 20261010); the ranking label is a heuristic, not ground truth. Do not claim real-factory accuracy. Model artifacts live in git-ignored `backend/mlartifacts/` — a fresh clone runs on rule fallback until `python scripts/train_duration_model.py` and `python scripts/train_allocation_ranker.py` are re-run. The scheduling dataset directory is currently **untracked**; commit it only on explicit approval.
+6. Frontend carries two module shells (Feature 02 `Layout` and quality `AppShell`) with separate navigation; cross-links added both ways (`/quality` ↔ `/`), plus Jobs ↔ Quality inspection links (`/jobs?job=` ↔ `/quality/inspections?job=`).
 
 ## Rules for updating this document
 

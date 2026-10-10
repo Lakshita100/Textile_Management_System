@@ -18,12 +18,13 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.adapters import OrderInfo, inventory_adapter, orders_adapter, quality_adapter
+from app.adapters import OrderInfo, inventory_adapter, orders_adapter
 from app.config import settings
 from app.models.machine import Machine, MachineStatus
 from app.models.production import ProductionJob, ProductionJobStatus
 from app.services.machines import completed_jobs_efficiency_percent, get_active_job
 from app.services.production import detect_schedule_conflict
+from app.services import allocation_ml, scheduling, quality as quality_service
 
 ACTIVE_STATUSES = (ProductionJobStatus.IN_PROGRESS, ProductionJobStatus.PAUSED)
 
@@ -41,6 +42,8 @@ class Candidate:
     final_score: float | None = None
     estimated_days: float | None = None
     warnings: list[str] = field(default_factory=list)
+    schedule: scheduling.ScheduleEstimate | None = None
+    ml_selection_probability: float | None = None
 
 
 def _estimate_days(machine: Machine, quantity: float) -> float:
@@ -174,14 +177,16 @@ def rank_machines(
             c.efficiency = settings.REC_NEUTRAL_SCORE
             c.warnings.append("No completed-job history — efficiency unknown; neutral fallback applied")
 
-        # --- Quality (Anand adapter; unknown → neutral + warning) ---
-        q = quality_adapter.get_machine_quality(machine.id)
-        rate = q.pass_rate
+        # --- Quality (persisted inspections; unknown/insufficient -> neutral + warning) ---
+        rate, sample_count, q_note = quality_service.machine_quality_summary(db, machine.id)
         c.quality = rate
         c.quality_known = rate is not None
         if rate is None:
             c.quality = settings.REC_NEUTRAL_SCORE
-            c.warnings.append("No linked inspection history — quality unknown; neutral fallback applied")
+            c.warnings.append(
+                f"Insufficient linked inspection history ({q_note}) - quality unknown; "
+                "neutral fallback applied"
+            )
 
         c.final_score = round(
             settings.REC_WEIGHT_EFFICIENCY * float(c.efficiency)
@@ -189,6 +194,20 @@ def rank_machines(
             + settings.REC_WEIGHT_QUALITY * float(c.quality),
             2,
         )
+
+        # --- Scheduling estimate (Phase D): feasible start/completion, idle, deadline ---
+        c.schedule = scheduling.compute_schedule(
+            db, machine, required_quantity, quantity_unit, process, deadline
+        )
+
+        # --- Experimental ML allocation probability (Phase C) — never overrides score/constraints ---
+        c.ml_selection_probability = allocation_ml.selection_probability(
+            machine,
+            process=process,
+            quantity_kg=None if quantity_unit.strip().lower() != "kg" else required_quantity,
+            schedule=c.schedule,
+        )
+
         candidates.append(c)
 
     eligible = sorted([c for c in candidates if c.eligible], key=lambda x: x.final_score or 0, reverse=True)
@@ -209,6 +228,18 @@ def build_explanation(cand: Candidate | None, material_note: str, warnings: list
     ]
     if cand.estimated_days is not None:
         parts.append(f"Estimated processing time ~{cand.estimated_days:.1f} days.")
+    if cand.schedule is not None:
+        s = cand.schedule
+        parts.append(
+            f"Schedule: earliest start {s.earliest_start_at.strftime('%Y-%m-%d %H:%M')} UTC, "
+            f"processing ~{s.processing_minutes:.0f} min ({s.processing_source}) + setup {s.setup_minutes:.0f} min, "
+            f"completion {s.completion_at.strftime('%Y-%m-%d %H:%M')} UTC, "
+            f"queue wait ~{s.queue_wait_minutes:.0f} min."
+        )
+        if s.deadline_feasible is False:
+            parts.append(f"Deadline NOT met — estimated lateness ~{s.lateness_minutes:.0f} min.")
+        elif s.deadline_feasible:
+            parts.append("Deadline feasible.")
     parts.append(material_note)
     if cand.warnings or warnings:
         parts.append("Note: '*' marks metrics with unknown history (neutral fallback, not measured performance).")
