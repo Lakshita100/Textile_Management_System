@@ -18,7 +18,8 @@ export default function AllInspectionsPage() {
     return () => clearTimeout(timer)
   }, [searchInput])
 
-  const machines = getMachines()
+  const machineOptions = useAsync(getMachines, [])
+  const machines = machineOptions.data ?? []
   const inspections = useAsync(
     () => getInspections({ search, machineId }),
     [search, machineId],

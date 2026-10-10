@@ -5,9 +5,12 @@ from app.models.production import (
     ProductionJobStatus,
     ProductionJobStatusEvent,
 )
+from app.models.quality import InspectionOutcome, QualityInspection
 from app.models.recommendation import MachineRecommendation, RecommendationDecision
 
 __all__ = [
+    "QualityInspection",
+    "InspectionOutcome",
     "Machine",
     "MachineStatus",
     "MachineStatusEvent",

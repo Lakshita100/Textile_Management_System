@@ -12,6 +12,12 @@ import type {
   Recommendation,
   StatusEvent,
 } from '../types';
+import type {
+  ApiCreateInspection,
+  ApiInspection,
+  ApiQualityDashboard,
+  ApiRollId,
+} from '../types/quality';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1',
@@ -71,4 +77,20 @@ export const recommendationsApi = {
 export const analyticsApi = {
   query: (params: { date_from?: string; date_to?: string; machine_id?: number }) =>
     api.get<AnalyticsRow[]>('/production/analytics', { params }).then((r) => r.data),
+};
+
+export const qualityApi = {
+  inspections: (params: {
+    search?: string;
+    outcome?: string;
+    machine_code?: string;
+    employee_id?: string;
+    page?: number;
+    page_size?: number;
+  }) => api.get<Page<ApiInspection>>('/quality/inspections', { params }).then((r) => r.data),
+  create: (body: ApiCreateInspection) =>
+    api.post<ApiInspection>('/quality/inspections', body).then((r) => r.data),
+  rollId: (batchNo: string) =>
+    api.get<ApiRollId>('/quality/roll-id', { params: { batch_no: batchNo } }).then((r) => r.data),
+  dashboard: () => api.get<ApiQualityDashboard>('/quality/dashboard').then((r) => r.data),
 };

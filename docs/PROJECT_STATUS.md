@@ -42,9 +42,9 @@ This file records only what has been inspected in the repository with evidence. 
 | Feature 02 — Machine Recommendation Engine | Implemented and verified | Rule-based scoring (0.40/0.35/0.25), eligibility gates before scoring, explanations, warnings, approval revalidation; live e2e verified |
 | Feature 02 — Performance & Quality-History Analytics | Implemented and verified (defect metric pending Anand) | `/production/analytics` returns per-machine output/efficiency/utilization/downtime; defect rate shown only from real quality data (none yet) |
 | Module 01 Raw Materials (Maahi) | Not implemented | Material gate served by labeled FIXTURE adapter |
-| Module 03 Quality (Anand) | Frontend implemented (merged from `anand`) | Quality dashboard, All Inspections, modal inspection form, employee session switcher at `/quality`; build/lint verified by Anand and re-verified post-merge — **in-memory demo data only; backend wiring pending** |
+| Module 03 Quality (Anand) | Frontend implemented (merged from `anand`) | Quality dashboard, All Inspections, modal inspection form ("Proceed" queues accepted metres to Packing), Packing page (`/quality/packing`), Dispatch page with country/state/city analytics (`/quality/dispatch`), employee session switcher at `/quality`; build/lint/preview verified 2026-10-10 — **in-memory demo data only; backend wiring pending** |
 | Module 04 Orders (Ram) | Not implemented | Order refs served by labeled FIXTURE adapter |
-| Modules 05/06 (Warehouse, Employees/Accounts) | Not implemented | Owners TBD |
+| Modules 05/06 (Warehouse, Employees/Accounts) | Not implemented (owners TBD) | Partial demo UI only: Packing + Dispatch screens live under Module 03 (`/quality/packing`, `/quality/dispatch`, in-memory demo data); no warehouse stock or logistics backend |
 | Authentication / RBAC | Not implemented | Config placeholders removed pending design; supervisor approval currently records approver name only |
 | Backend tests | Implemented and verified | `python -m pytest -q` → 29 passed |
 | Frontend tests / build | Implemented and verified | `npm test` → 3 passed; `npm run build` → success (incl. merged quality module); `npm run lint` → oxlint active |
