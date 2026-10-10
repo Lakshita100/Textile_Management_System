@@ -97,7 +97,7 @@ export function Footer() {
             <ul className="mt-4 space-y-2.5">
               <li>
                 <Link
-                  to="/signin"
+                  to="/login"
                   className="text-sm text-primary transition-colors hover:text-primary-dark"
                 >
                   Sign in to the platform

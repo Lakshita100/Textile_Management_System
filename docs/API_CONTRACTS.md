@@ -2,7 +2,7 @@
 
 **Convention:** base prefix `/api/v1`, plural resource names, standard HTTP methods, Pydantic-validated payloads, consistent error shape, pagination on list endpoints, CORS for the local frontend, OpenAPI served by FastAPI.
 
-**Current state (2026-10-10):** Feature 02 endpoints, ML scheduling endpoints and the Module 03 quality endpoints below are implemented and live-verified (`/api/v1`, OpenAPI at `/api/v1/openapi.json`). Module 01/04 remain FIXTURE adapters.
+**Current state (2026-10-10):** Feature 02 endpoints, ML scheduling endpoints and the Module 03 quality endpoints are implemented and live-verified (`/api/v1`, OpenAPI at `/api/v1/openapi.json`). Module 01 inventory and Module 04 orders APIs remain unpublished. Ram's frontend workflow is a browser-local demo and is not a backend API contract.
 
 ## Status of cross-module contracts
 
@@ -10,7 +10,7 @@
 |---|---|---|
 | Module 01 — Raw materials / inventory | Maahi | Not published |
 | Module 03 — Quality inspections | Anand | **Implemented in this repository** (persistent backend under `/api/v1/quality`, integrated 2026-10-10; his terminology and outcome enum preserved) |
-| Module 04 — Orders | Ram | Not published |
+| Module 04 — Orders | Ram | Not published; browser-local demo UI only |
 
 Integration points Feature 02 will need (see `DATA_SOURCES_AND_INTEGRATION.md`): order specs + deadline; material availability; machine-linked quality history. Until owners publish contracts, these remain open items — any interim mock requires explicit approval and clear labelling.
 

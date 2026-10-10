@@ -10,11 +10,13 @@ All operational data lives in the single project PostgreSQL database. Each domai
 
 | # | Dependency | Owner | Purpose in Feature 02 | Expected identifiers / units | Contract status (2026-10-10) |
 |---|---|---|---|---|---|
-| D1 | `orders` — order specs, quantities, deadlines | **Ram (Module 04)** | Recommendation input; delay alerts; assignment linkage | `order_id`, line items, quantity + unit (m/kg), `deadline` datetime | **NOT AVAILABLE** — no module code, API or schema exists in this repository |
-| D2 | `raw_materials` — stock availability | **Maahi (Module 01)** | Hard eligibility gate (material must be available before scheduling) | `material_id`, quantity on hand + unit, reserved qty | **NOT AVAILABLE** — no module code, API or schema exists |
+| D1 | `orders` — order specs, quantities, deadlines | **Ram (Module 04)** | Recommendation input; delay alerts; assignment linkage | `order_id`, line items, quantity + unit (m/kg), `deadline` datetime | **Backend contract NOT AVAILABLE** — frontend buyer/admin demo flow uses browser local storage; no shared API/schema |
+| D2 | `raw_materials` — stock availability | **Maahi (Module 01)** | Hard eligibility gate (material must be available before scheduling) | `material_id`, quantity on hand + unit, reserved qty | **NOT AVAILABLE** — no Maahi API or schema exists |
 | D3 | `quality_inspections` — historical inspection outcomes | **Anand (Module 03)** | Machine quality score (numerator/denominator defined at Phase 1) | `inspection_id`, linked roll/order/machine, defect counts, outcome (approved/rework/rejected) | **NOT AVAILABLE** — no module code, API or schema exists |
 
 For each dependency, before integration the following must be confirmed with the owner and recorded here: actual endpoint or shared entity; request/response schema; identifiers and units; authentication and permissions; error and unavailable-service behavior; data refresh expectations.
+
+Ram's current UI prototype stores buyer requests, review decisions, and explicitly shared buyer messages in browser local storage. Ram may also enter a manual material quantity for a workflow demonstration; it is labelled `Ram demo check`, is not a Maahi inventory result, and must not be treated as live availability. No order or inventory database/API integration is implied.
 
 ### Unavailable-dependency policy
 
