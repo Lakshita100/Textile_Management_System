@@ -30,7 +30,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-line bg-surface">
-      <div className="mx-auto flex h-[84px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-[92px] lg:gap-5 lg:px-8 xl:gap-8">
+      <div className="mx-auto flex h-[84px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:gap-5 lg:px-8 xl:gap-8">
         <a
           href="#home"
           className="shrink-0 rounded-md py-1"

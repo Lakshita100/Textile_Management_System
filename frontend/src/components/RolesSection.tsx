@@ -11,7 +11,7 @@ const ROLE_ICONS = {
 
 export function RolesSection() {
   return (
-    <section id="roles" className="scroll-mt-24 bg-surface py-20 lg:py-28">
+    <section id="roles" className="scroll-mt-24 bg-surface py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="reveal">
           <SectionHeading
@@ -22,13 +22,13 @@ export function RolesSection() {
         </div>
 
         <div className="reveal">
-          <ul className="mt-14 grid gap-6 sm:grid-cols-2 lg:mt-16 lg:grid-cols-4">
+          <ul className="mt-12 grid gap-5 sm:grid-cols-2 lg:mt-14 lg:grid-cols-4">
             {DEMO_ROLES.map((role) => {
               const Icon = ROLE_ICONS[role.icon];
               return (
                 <li
                   key={role.id}
-                  className="rounded-xl border border-line bg-surface p-6 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-elevated"
+                  className="h-full rounded-xl border border-line bg-surface p-6 shadow-card"
                 >
                   <span
                     aria-hidden

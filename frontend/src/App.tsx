@@ -38,7 +38,6 @@ import {
   AdminOrdersPage,
   AdminOrderReviewPage,
   AdminInquiriesPage,
-  AdminModulePlaceholderPage,
 } from './pages/AdminPanel';
 import { AuthProvider } from './store/AuthProvider';
 import { SessionProvider } from './store/SessionProvider';
@@ -80,16 +79,20 @@ export default function App() {
                 <Route path="incoming" element={<AdminIncomingOrdersPage />} />
                 <Route path="manual-order" element={<AdminManualOrderPage />} />
                 <Route path="inquiries" element={<AdminInquiriesPage />} />
-                <Route path="employees" element={<AdminEmployeesPage />} />
+<Route path="employees" element={<AdminEmployeesPage />} />
                 <Route path="attendance" element={<AttendancePage />} />
-                <Route path="materials" element={<RawMaterialsPage />} />
+                <Route path="materials" element={<RawMaterialsPage defaultSection="inventory" hideTabs />} />
+                <Route path="alerts" element={<RawMaterialsPage defaultSection="alerts" hideTabs />} />
+                <Route path="movements" element={<RawMaterialsPage defaultSection="movements" hideTabs />} />
+                <Route path="suppliers" element={<RawMaterialsPage defaultSection="suppliers" hideTabs />} />
+                <Route path="purchases" element={<RawMaterialsPage defaultSection="purchases" hideTabs />} />
                 <Route path="production" element={<DashboardPage />} />
                 <Route path="machines" element={<MachinesPage />} />
                 <Route path="machines/:id" element={<MachineDetailPage />} />
                 <Route path="jobs" element={<JobsPage />} />
                 <Route path="recommend" element={<RecommendPage />} />
-                <Route path="quality" element={<AdminModulePlaceholderPage title="Quality Management" description="Inspection checkpoints, defect tracking, lot acceptance and compliance reporting." />} />
-                <Route path="dispatch" element={<AdminModulePlaceholderPage title="Dispatch & Delivery" description="Shipment readiness, route coordination, dispatch notes and final delivery status." />} />
+                <Route path="quality" element={<QualityDashboardPage />} />
+                <Route path="dispatch" element={<DispatchPage />} />
               </Route>
 
               {/* Factory management application (requires a signed-in staff/admin account) */}

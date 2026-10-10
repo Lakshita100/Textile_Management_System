@@ -7,7 +7,6 @@
  */
 
 export type StatTone = 'success' | 'error' | 'info' | 'warning';
-export type IconTone = 'primary' | 'accent' | 'purple' | 'warning';
 
 export interface DemoStat {
   id: string;
@@ -55,7 +54,6 @@ export const DEMO_STATS: DemoStat[] = [
 export interface DemoFeature {
   id: string;
   icon: 'package' | 'factory' | 'shield' | 'clipboard' | 'truck' | 'users';
-  tone: 'primary' | 'accent';
   title: string;
   description: string;
 }
@@ -64,7 +62,6 @@ export const DEMO_FEATURES: DemoFeature[] = [
   {
     id: 'smart-inventory',
     icon: 'package',
-    tone: 'primary',
     title: 'Smart Inventory',
     description:
       'Track incoming yarn, material types, colours, available quantities, and low-stock alerts.',
@@ -72,7 +69,6 @@ export const DEMO_FEATURES: DemoFeature[] = [
   {
     id: 'production-management',
     icon: 'factory',
-    tone: 'accent',
     title: 'Production Management',
     description:
       'Monitor spinning, weaving, and dyeing progress, assigned machines, production quantities, and delays.',
@@ -80,7 +76,6 @@ export const DEMO_FEATURES: DemoFeature[] = [
   {
     id: 'quality-control',
     icon: 'shield',
-    tone: 'primary',
     title: 'Quality Control',
     description:
       'Record fabric defects, manage inspections, and trace each roll back to its production order and machine.',
@@ -88,7 +83,6 @@ export const DEMO_FEATURES: DemoFeature[] = [
   {
     id: 'order-tracking',
     icon: 'clipboard',
-    tone: 'accent',
     title: 'Order Tracking',
     description:
       'Track buyer orders from confirmation to production, quality inspection, and dispatch.',
@@ -96,7 +90,6 @@ export const DEMO_FEATURES: DemoFeature[] = [
   {
     id: 'dispatch-management',
     icon: 'truck',
-    tone: 'primary',
     title: 'Dispatch Management',
     description:
       'Manage finished rolls, packing, shipment quantities, delivery information, and invoice matching.',
@@ -104,7 +97,6 @@ export const DEMO_FEATURES: DemoFeature[] = [
   {
     id: 'workforce-accounts',
     icon: 'users',
-    tone: 'accent',
     title: 'Workforce and Accounts',
     description:
       'Maintain worker attendance, wage records, material expenses, buyer payments, and order-wise costing.',

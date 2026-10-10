@@ -1,6 +1,19 @@
-import { useState } from 'react'
-import { Link, NavLink, Navigate, Outlet, useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, ArrowRight, Bell, CheckCircle2, ClipboardList, FileText, PackageCheck, Search, ShieldCheck, Truck } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
+import {
+  AlertCircle,
+  ArrowRight,
+  Bell,
+  CheckCircle2,
+  ChevronDown,
+  ClipboardList,
+  FileText,
+  Menu,
+  PackageCheck,
+  Search,
+  ShieldCheck,
+  Truck,
+} from 'lucide-react'
 import { buttonClass } from '../components/ui/Button'
 import { useAuth } from '../store/AuthProvider'
 import {
@@ -16,22 +29,47 @@ import {
   updateInquiryStatus,
 } from '../services/orderService'
 
-const adminNav = [
-  { to: '/admin', label: 'Overview', end: true },
-  { to: '/admin/orders', label: 'All Orders', end: false },
-  { to: '/admin/incoming', label: 'Incoming Orders', end: false },
-  { to: '/admin/manual-order', label: 'Create Manual Order', end: false },
-  { to: '/admin/inquiries', label: 'Order Inquiries', end: false },
-  { to: '/admin/employees', label: 'Employee Access', end: false },
-  { to: '/admin/attendance', label: 'Attendance Register', end: false },
-  { to: '/admin/materials', label: 'Raw Materials', end: false },
-  { to: '/admin/production', label: 'Production Management', end: false },
-  { to: '/admin/machines', label: 'Machine Management', end: false },
-  { to: '/admin/jobs', label: 'Production Jobs', end: false },
-  { to: '/admin/recommend', label: 'Machine Recommendations', end: false },
-  { to: '/admin/quality', label: 'Quality Management', end: false },
-  { to: '/admin/dispatch', label: 'Dispatch & Delivery', end: false },
+const adminNavSections: ReadonlyArray<{
+  title: string
+  items: ReadonlyArray<{ to: string; label: string; end: boolean }>
+}> = [
+  {
+    title: 'OVERVIEW',
+    items: [{ to: '/admin', label: 'Dashboard', end: true }],
+  },
+  {
+    title: 'ORDER MANAGEMENT',
+    items: [
+      { to: '/admin/incoming', label: 'Incoming Orders', end: false },
+      { to: '/admin/orders', label: 'All Orders', end: false },
+      { to: '/admin/manual-order', label: 'Create Manual Order', end: false },
+      { to: '/admin/inquiries', label: 'Order Inquiries', end: false },
+    ],
+  },
+  {
+    title: 'INVENTORY & OPERATIONS',
+    items: [
+      { to: '/admin/materials', label: 'Raw Materials & Inventory', end: false },
+      { to: '/admin/suppliers', label: 'Suppliers & Purchases', end: false },
+      { to: '/admin/movements', label: 'Stock Movements', end: false },
+      { to: '/admin/alerts', label: 'Low-Stock Alerts', end: false },
+      { to: '/admin/machines', label: 'Machines', end: false },
+      { to: '/admin/jobs', label: 'Production Jobs', end: false },
+      { to: '/admin/recommend', label: 'Production Recommendations', end: false },
+      { to: '/admin/quality', label: 'Quality Control', end: false },
+      { to: '/admin/dispatch', label: 'Packing & Dispatch', end: false },
+    ],
+  },
+  {
+    title: 'TEAM & ATTENDANCE',
+    items: [
+      { to: '/admin/employees', label: 'Employee Access', end: false },
+      { to: '/admin/attendance', label: 'Attendance Register', end: false },
+    ],
+  },
 ]
+
+const adminNav: Array<{ to: string; label: string; end: boolean }> = adminNavSections.flatMap((group) => group.items)
 
 export function AdminRouteGuard() {
   const { user, loading } = useAuth()
@@ -59,6 +97,7 @@ export function AdminRouteGuard() {
 
 export function AdminPanelLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const session = getCurrentSession()
 
   const { signOut } = useAuth()
@@ -66,35 +105,75 @@ export function AdminPanelLayout() {
     void signOut().finally(() => navigate('/login'))
   }
 
+  const activeLabel = adminNavSections.flatMap((group) => group.items).find((item) => (item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)))?.label ?? 'Dashboard'
+
+  useEffect(() => {
+    if (location.pathname === '/admin/manual-order') {
+      const current = getAllOrders()
+      const existing = current.find((order) => order.source === 'Manual' && order.status === 'Submitted' && order.companyName === 'Manual buyer')
+      if (existing) {
+        localStorage.setItem('everest-admin-last-location', '/admin/incoming')
+      }
+    }
+  }, [location.pathname])
+
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <div className="flex min-h-screen flex-col xl:flex-row">
         <aside className="border-b border-line bg-surface xl:w-72 xl:border-b-0 xl:border-r">
           <div className="border-b border-line px-5 py-4">
-            <p className="font-display text-xl font-bold text-primary">Everest Admin</p>
-            <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-muted">Factory management</p>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-lg font-extrabold text-white">E</div>
+              <div>
+                <p className="font-display text-xl font-bold text-primary">EVEREST</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-muted">TEXTILE MILLS</p>
+              </div>
+            </div>
+            <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">Admin Panel</p>
           </div>
 
-          <nav className="flex flex-col gap-1 p-3" aria-label="Admin navigation">
-            {adminNav.map(({ to, label, end }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) =>
-                  `rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                    isActive ? 'bg-primary text-white' : 'text-muted hover:bg-canvas hover:text-primary'
-                  }`
-                }
-              >
-                {label}
-              </NavLink>
+          <nav className="flex flex-col gap-4 p-3" aria-label="Admin navigation">
+            {adminNavSections.map((section) => (
+              <div key={section.title}>
+                <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">{section.title}</p>
+                <div className="space-y-1">
+                  {section.items.map(({ to, label, end }) => (
+                    <NavLink
+                      key={`${section.title}-${to}`}
+                      to={to}
+                      end={end}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-2xl border px-4 py-3 text-base font-medium transition-all ${
+                          isActive
+                            ? 'border-primary bg-primary text-white shadow-sm'
+                            : 'border-primary/70 bg-[rgba(226,238,255,0.8)] text-primary hover:border-primary hover:bg-primary/5'
+                        }`
+                      }
+                    >
+                      {({ isActive }) => (
+                        <>
+                          <ArrowRight className={`h-4 w-4 ${isActive ? 'text-white' : 'text-primary'}`} />
+                          <span>{label}</span>
+                        </>
+                      )}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
 
           <div className="mt-auto border-t border-line p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted">Signed in</p>
-            <p className="mt-2 text-sm font-semibold text-ink">{session?.name ?? 'Admin user'}</p>
+            <div className="flex items-center justify-between rounded-xl border border-line bg-canvas px-3 py-2">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-white">AD</div>
+                <div>
+                  <p className="text-sm font-semibold text-ink">{session?.name ?? 'Admin User'}</p>
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted">Administrator</p>
+                </div>
+              </div>
+              <ChevronDown className="h-4 w-4 text-muted" />
+            </div>
             <button type="button" onClick={handleLogout} className="mt-3 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm font-medium text-ink">
               Logout
             </button>
@@ -103,9 +182,14 @@ export function AdminPanelLayout() {
 
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3 sm:px-6">
-            <div>
-              <p className="text-sm text-muted">Operations control</p>
-              <p className="text-xl font-semibold text-ink">Admin panel</p>
+            <div className="flex items-center gap-3">
+              <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-line bg-canvas text-muted xl:hidden" aria-label="Open navigation menu">
+                <Menu className="h-4 w-4" />
+              </button>
+              <div>
+                <p className="text-sm text-muted">Operations control</p>
+                <p className="text-xl font-semibold text-ink">{activeLabel}</p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" className="rounded-xl border border-line bg-canvas p-2 text-muted" aria-label="Notifications">
