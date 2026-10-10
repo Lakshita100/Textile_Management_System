@@ -27,10 +27,11 @@ Core demonstration flow: raw material → order → machine recommendation → p
 
 | Area | Status | Evidence / next action |
 |---|---|---|
-| Repository and existing code | Not audited | Inspect actual repo, package files, git status and tree |
-| Theme tokens / global CSS in actual app | Handoff specification provided; repo integration unverified | Copy/adapt CSS files and verify all UI uses tokens |
-| Frontend shell and navigation | Not audited | Inspect source and run frontend |
-| Dashboard and analytics | Not audited | Verify screens and data source |
+| Repository and existing code | Implemented, verified (landing) | Inspected repo; `frontend/` scaffolded with Vite+React+TS+Tailwind; typecheck/lint/build all pass |
+| **Public landing page** | **Implemented and verified** | 10 sections + `/signin` `/privacy` `/terms` 404 routes; Playwright 0px overflow at 6 breakpoints |
+| Theme tokens / global CSS in actual app | Implemented, unverified (palette conflict) | Tokens in `frontend/src/index.css` use owner-spec palette (#0866C6/#073B63/#76B82A); `ai/…theme.css` still shows legacy #3F85C4 — **owner decision needed** |
+| Frontend shell and navigation | Implemented and verified | Sticky header, scroll-spy active state, mobile hamburger, working anchors + CTAs |
+| Dashboard and analytics | Preview only (sample data) | Static React `DashboardMock` on landing page; no live data source |
 | Inventory and suppliers | Not audited | Verify CRUD, stock thresholds and persistence |
 | Orders | Not audited | Verify lifecycle and material checks |
 | Machine recommendation | Not audited | Verify hard eligibility checks, scoring and explanations |
