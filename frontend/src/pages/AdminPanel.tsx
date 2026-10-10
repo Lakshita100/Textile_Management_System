@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useNavigate, useParams } from 'react-router-dom'
 import { AlertCircle, ArrowRight, Bell, CheckCircle2, ClipboardList, FileText, PackageCheck, Search, ShieldCheck, Truck } from 'lucide-react'
 import { buttonClass } from '../components/ui/Button'
+import { useAuth } from '../store/AuthProvider'
 import {
   addOrderReviewNote,
   getAdminOverview,
@@ -9,7 +10,6 @@ import {
   getAllOrders,
   getCurrentSession,
   getMaterialAvailability,
-  logoutCurrentUser,
   recordDemoMaterialAvailability,
   recordOrderReviewAction,
   respondToInquiry,
@@ -22,17 +22,33 @@ const adminNav = [
   { to: '/admin/incoming', label: 'Incoming Orders', end: false },
   { to: '/admin/manual-order', label: 'Create Manual Order', end: false },
   { to: '/admin/inquiries', label: 'Order Inquiries', end: false },
-  { to: '/admin/materials', label: 'Material Management', end: false },
+  { to: '/admin/materials', label: 'Raw Materials', end: false },
   { to: '/admin/production', label: 'Production Management', end: false },
+  { to: '/admin/machines', label: 'Machine Management', end: false },
+  { to: '/admin/jobs', label: 'Production Jobs', end: false },
+  { to: '/admin/recommend', label: 'Machine Recommendations', end: false },
   { to: '/admin/quality', label: 'Quality Management', end: false },
   { to: '/admin/dispatch', label: 'Dispatch & Delivery', end: false },
 ]
 
 export function AdminRouteGuard() {
-  const session = getCurrentSession()
-  if (!session || session.role !== 'admin') {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-sm text-muted">
+        Checking your session…
+      </div>
+    )
+  }
+
+  if (!user) {
     return <Navigate to="/login" replace />
   }
+  if (user.role !== 'admin') {
+    return <Navigate to={user.role === 'buyer' ? '/buyer' : '/dashboard'} replace />
+  }
+
   return <AdminPanelLayout />
 }
 
@@ -40,9 +56,9 @@ export function AdminPanelLayout() {
   const navigate = useNavigate()
   const session = getCurrentSession()
 
+  const { signOut } = useAuth()
   const handleLogout = () => {
-    logoutCurrentUser()
-    navigate('/login')
+    void signOut().finally(() => navigate('/login'))
   }
 
   return (
@@ -51,7 +67,7 @@ export function AdminPanelLayout() {
         <aside className="border-b border-line bg-surface xl:w-72 xl:border-b-0 xl:border-r">
           <div className="border-b border-line px-5 py-4">
             <p className="font-display text-xl font-bold text-primary">Everest Admin</p>
-            <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-muted">Order management</p>
+            <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-muted">Factory management</p>
           </div>
 
           <nav className="flex flex-col gap-1 p-3" aria-label="Admin navigation">
@@ -170,6 +186,15 @@ export function AdminOverviewPage() {
             </Link>
             <Link to="/admin/orders" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
               All Orders <ArrowRight className="h-4 w-4 text-primary" />
+            </Link>
+            <Link to="/admin/materials" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
+              Raw Materials <ArrowRight className="h-4 w-4 text-primary" />
+            </Link>
+            <Link to="/admin/production" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
+              Production Dashboard <ArrowRight className="h-4 w-4 text-primary" />
+            </Link>
+            <Link to="/admin/machines" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
+              Machine Management <ArrowRight className="h-4 w-4 text-primary" />
             </Link>
           </div>
         </div>

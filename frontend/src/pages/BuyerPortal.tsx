@@ -13,6 +13,7 @@ import {
   Truck,
 } from 'lucide-react'
 import { buttonClass } from '../components/ui/Button'
+import { useAuth } from '../store/AuthProvider'
 import {
   createInquiryForOrder,
   addBuyerOrderResponse,
@@ -20,7 +21,6 @@ import {
   getInquiriesForBuyer,
   getOrderById,
   getOrdersForBuyer,
-  logoutCurrentUser,
   updateBuyerProfile,
 } from '../services/orderService'
 
@@ -37,7 +37,24 @@ function isBuyerLoggedIn() {
 }
 
 export function BuyerRouteGuard() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas text-sm text-muted">
+        Checking your session…
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+  if (user.role !== 'buyer') {
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} replace />
+  }
   if (!isBuyerLoggedIn()) {
+    // JWT is valid but portal session not synced yet (e.g. another tab cleared it).
     return <Navigate to="/login" replace />
   }
 
@@ -48,9 +65,9 @@ export function BuyerPortalLayout() {
   const session = getCurrentSession()
   const navigate = useNavigate()
 
+  const { signOut } = useAuth()
   const handleLogout = () => {
-    logoutCurrentUser()
-    navigate('/login')
+    void signOut().finally(() => navigate('/login'))
   }
 
   return (
@@ -518,9 +535,9 @@ export function BuyerProfilePage() {
     country: buyer?.country ?? '',
   })
 
+  const { signOut } = useAuth()
   const handleLogout = () => {
-    logoutCurrentUser()
-    navigate('/login')
+    void signOut().finally(() => navigate('/login'))
   }
 
   const handleSave = () => {

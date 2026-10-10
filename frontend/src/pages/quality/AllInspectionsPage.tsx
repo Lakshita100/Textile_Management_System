@@ -43,7 +43,7 @@ export default function AllInspectionsPage() {
       <PageHeader
         title="All Inspections"
         actions={
-          <button type="button" className="btn-primary" onClick={openForm}>
+          <button type="button" className="btn-primary" onClick={() => openForm()}>
             New inspection
           </button>
         }
@@ -162,7 +162,7 @@ export default function AllInspectionsPage() {
                     <td className="px-4 py-2">{insp.inspectedAt}</td>
                     <td className="px-4 py-2">
                       <Link
-                        to={`/app/jobs?job=${insp.jobId}`}
+                        to={`/jobs?job=${insp.jobId}`}
                         className="font-medium text-action hover:underline"
                         title={`Open production job #${insp.jobId}`}
                       >
@@ -198,7 +198,7 @@ export default function AllInspectionsPage() {
                     Clear filters
                   </button>
                 ) : (
-                  <button type="button" className="btn-primary" onClick={openForm}>
+                  <button type="button" className="btn-primary" onClick={() => openForm()}>
                     New inspection
                   </button>
                 )

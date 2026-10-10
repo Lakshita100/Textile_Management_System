@@ -21,7 +21,7 @@ export default function MachinesPage() {
     machinesApi
       .list({ search: search || undefined, status: status || undefined, process: process || undefined, page_size: 50 })
       .then(setData)
-      .catch((e) => setError(apiErrorMessage(e)))
+      .catch((e: unknown) => setError(apiErrorMessage(e)))
       .finally(() => setLoading(false));
   }, [search, status, process]);
 
@@ -92,7 +92,7 @@ export default function MachinesPage() {
             <tbody>
               {data.items.map((m) => (
                 <tr key={m.id} className="border-t" style={{ borderColor: 'var(--color-border)' }}>
-                  <td className="p-3 font-medium"><Link to={`/app/machines/${m.id}`} style={{ color: 'var(--color-link)' }}>{m.code}</Link></td>
+                  <td className="p-3 font-medium"><Link to={`/machines/${m.id}`} style={{ color: 'var(--color-link)' }}>{m.code}</Link></td>
                   <td className="p-3">{m.name}</td>
                   <td className="p-3">{m.machine_type}</td>
                   <td className="p-3 text-xs">{m.supported_processes}</td>

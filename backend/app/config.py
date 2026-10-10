@@ -16,21 +16,26 @@ class Settings(BaseSettings):
     )
 
     # Database
-    DATABASE_URL: str = "postgresql+psycopg2://postgres:postgres@localhost:5432/textile_manufacturing"
+    DATABASE_URL: str = "sqlite:///./textile_dev.db"
+
+    # JWT (placeholder - real deployment requires tested auth)
+    SECRET_KEY: str = "change-me-in-production"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ALGORITHM: str = "HS256"
 
     # Application
     APP_NAME: str = "Textile Manufacturing Intelligence System"
     API_PREFIX: str = "/api/v1"
-    DEBUG: bool = False
-    SQL_ECHO: bool = False
+    DEBUG: bool = True
+    ECHO_SQL: bool = False
 
-    # CORS (local frontend dev server)
+    # CORS
     BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     # Environment
     ENVIRONMENT: str = "development"
 
-    # Feature 02 recommendation weights (initial business-rule weights; NOT validated factory parameters)
+    # Feature 02 recommendation weights
     REC_WEIGHT_EFFICIENCY: float = 0.40
     REC_WEIGHT_WORKLOAD: float = 0.35
     REC_WEIGHT_QUALITY: float = 0.25

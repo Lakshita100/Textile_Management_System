@@ -4,10 +4,10 @@ export type ButtonVariant = 'primary' | 'secondary' | 'onDark' | 'onDarkOutline'
 export type ButtonSize = 'md' | 'lg';
 
 const BASE =
-  'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors duration-150';
+  'inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-60';
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-primary text-white hover:bg-primary-dark active:bg-primary-dark',
+  primary: 'border border-primary bg-primary text-white shadow-sm hover:border-primary-dark hover:bg-primary-dark active:translate-y-px',
   secondary:
     'border border-line bg-surface text-ink hover:border-primary hover:text-primary',
   onDark: 'bg-white text-primary-dark hover:bg-white/90 active:bg-white/85',

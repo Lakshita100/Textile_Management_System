@@ -18,7 +18,41 @@ from app.models import (
     ProductionJobStatus,
     QualityInspection,
 )
+from app.services.auth import seed_user
 from app.services.production import create_job, transition_job, update_progress
+
+
+def _seed_accounts(db) -> None:
+    """Idempotent demo accounts for the real auth module (JWT sign-in).
+
+    Admin accounts can never be self-registered — they are provisioned here.
+    """
+    accounts = [
+        dict(
+            email="admin@everestmills.com",
+            password="Admin@1234",
+            full_name="Factory Admin",
+            role="admin",
+            company="Everest Textile Mills",
+        ),
+        dict(
+            email="buyer@everestmills.com",
+            password="Demo@1234",
+            full_name="Aisha Rahman",
+            role="buyer",
+            company="Northwind Retail",
+        ),
+        dict(
+            email="staff@everestmills.com",
+            password="Staff@1234",
+            full_name="Priya Sharma",
+            role="staff",
+            company="Everest Textile Mills",
+        ),
+    ]
+    created = [seed_user(db, **account) for account in accounts]
+    if any(created):
+        print("Seeded auth accounts: admin/buyer/staff (see docs or login pages).")
 
 
 def _create_jobs(db) -> dict[str, ProductionJob]:
@@ -128,6 +162,7 @@ def seed() -> None:
     Base.metadata.create_all(bind=engine)  # no-op if migrated
     db = SessionLocal()
     try:
+        _seed_accounts(db)
         jobs: dict[str, ProductionJob] = {}
         existing = db.query(Machine).filter(Machine.code == "LOOM-01").first()
         if existing:

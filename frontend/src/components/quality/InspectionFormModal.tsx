@@ -41,7 +41,7 @@ function today(): string {
 const inputClass = (hasError: boolean) =>
   `rounded-md border bg-canvas px-3 py-2 text-sm ${hasError ? 'border-title border-2' : ''}`
 
-export default function InspectionFormModal() {
+export default function InspectionFormModal({ initialMachineId }: { initialMachineId?: string } = {}) {
   const { closeForm } = useInspectionForm()
   const { employee } = useSession()
   const navigate = useNavigate()
@@ -49,7 +49,7 @@ export default function InspectionFormModal() {
   const machines = machineOptions.data ?? []
   const machineRef = useRef<HTMLSelectElement>(null)
 
-  const [machineId, setMachineId] = useState('')
+  const [machineId, setMachineId] = useState(initialMachineId ?? '')
   const [defects, setDefects] = useState<FormDefect[]>([
     { type: '', count: '1', severity: 'Medium' },
   ])

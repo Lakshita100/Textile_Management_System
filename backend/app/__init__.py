@@ -1,2 +1,3 @@
-﻿from app.database import Base, engine  # noqa
-from app import models  # noqa — register all tables
+"""Textile Manufacturing Intelligence System — backend application package."""
+
+__version__ = "0.1.0"

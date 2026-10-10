@@ -5,15 +5,22 @@ import { InspectionFormContext } from './inspectionFormContext'
 
 export function InspectionFormProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [initialMachineId, setInitialMachineId] = useState<string | undefined>()
 
-  const openForm = useCallback(() => setIsOpen(true), [])
-  const closeForm = useCallback(() => setIsOpen(false), [])
+  const openForm = useCallback((machineId?: string) => {
+    setInitialMachineId(machineId)
+    setIsOpen(true)
+  }, [])
+  const closeForm = useCallback(() => {
+    setIsOpen(false)
+    setInitialMachineId(undefined)
+  }, [])
   const value = useMemo(() => ({ openForm, closeForm }), [openForm, closeForm])
 
   return (
     <InspectionFormContext.Provider value={value}>
       {children}
-      {isOpen ? <InspectionFormModal /> : null}
+      {isOpen ? <InspectionFormModal initialMachineId={initialMachineId} /> : null}
     </InspectionFormContext.Provider>
   )
 }

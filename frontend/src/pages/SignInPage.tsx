@@ -1,22 +1,37 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, CircleAlert, Info } from 'lucide-react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, CircleAlert, Loader2 } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { buttonClass } from '../components/ui/Button';
+import { useAuth } from '../store/AuthProvider';
+import type { AuthRole } from '../services/authService';
+import { errorMessage } from '../services/http';
 
 interface FormErrors {
   email?: string;
   password?: string;
 }
 
+const homeForRole = (role: AuthRole): string =>
+  role === 'admin' ? '/admin' : role === 'buyer' ? '/buyer' : '/dashboard';
+
 export default function SignInPage() {
+  const { signIn, user, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
-  const [status, setStatus] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  if (!loading && user) {
+    const from = (location.state as { from?: string } | null)?.from;
+    return <Navigate to={from ?? homeForRole(user.role)} replace />;
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextErrors: FormErrors = {};
@@ -30,13 +45,18 @@ export default function SignInPage() {
     }
 
     setErrors(nextErrors);
+    setFormError(null);
+    if (Object.keys(nextErrors).length > 0) return;
 
-    if (Object.keys(nextErrors).length === 0) {
-      setStatus(
-        'This preview build is not connected to an authentication service yet — your credentials were not sent anywhere. Sign-in will work once the backend API is connected.',
-      );
-    } else {
-      setStatus(null);
+    setSubmitting(true);
+    try {
+      const account = await signIn(email.trim().toLowerCase(), password);
+      const from = (location.state as { from?: string } | null)?.from;
+      navigate(from ?? homeForRole(account.role), { replace: true });
+    } catch (error) {
+      setFormError(errorMessage(error));
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -65,12 +85,6 @@ export default function SignInPage() {
             </h1>
             <p className="mt-2 text-sm text-muted">
               Access your Everest Textile Mills factory workspace.
-            </p>
-
-            <p className="mt-5 flex items-start gap-2.5 rounded-lg border border-line bg-canvas p-3 text-xs leading-relaxed text-muted">
-              <Info aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
-              Authentication is not connected in this preview build. The form
-              below demonstrates the intended sign-in flow only.
             </p>
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-5">
@@ -136,27 +150,46 @@ export default function SignInPage() {
                 ) : null}
               </div>
 
+              {formError ? (
+                <p className="flex items-start gap-2.5 rounded-lg border border-error/40 bg-error/5 p-3 text-xs leading-relaxed text-error">
+                  <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+                  {formError}
+                </p>
+              ) : null}
+
               <button
                 type="submit"
-                className={buttonClass('primary', 'md', 'h-12 w-full text-base')}
+                disabled={submitting}
+                className={buttonClass('primary', 'md', 'h-12 w-full text-base disabled:opacity-60')}
               >
-                Sign In
+                {submitting ? (
+                  <>
+                    <Loader2 aria-hidden className="size-4 animate-spin" />
+                    Signing in…
+                  </>
+                ) : (
+                  'Sign In'
+                )}
               </button>
             </form>
 
-            <div aria-live="polite" className="mt-5">
-              {status ? (
-                <p className="flex items-start gap-2.5 rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs leading-relaxed text-ink">
-                  <Info aria-hidden className="mt-0.5 size-4 shrink-0 text-primary" />
-                  {status}
-                </p>
-              ) : null}
+            <div className="mt-5 flex items-center justify-between text-xs text-muted">
+              <Link to="/forgot-password" className="font-medium text-primary">
+                Forgot password?
+              </Link>
+              <Link to="/login" className="font-medium text-primary">
+                Buyer portal
+              </Link>
             </div>
           </div>
 
           <p className="mt-6 text-center text-xs text-muted">
-            Don't have an account yet? Factory workspaces are created by your
-            administrator.
+            No account yet?{' '}
+            <Link to="/signup" className="font-semibold text-primary">
+              Create one
+            </Link>{' '}
+            — buyer and staff accounts are self-serve; admin accounts are
+            provisioned by your administrator.
           </p>
         </div>
       </main>

@@ -15,7 +15,7 @@ DefectTypeLiteral = Literal["Low", "Medium", "High"]
 class DefectIn(BaseModel):
     type: str = Field(min_length=1, max_length=64)
     count: int = Field(ge=1)
-    severity: DefectTypeLiteral
+    severity: DefectTypeLiteral = Field(default="Medium")
     remarks: str | None = Field(default=None, max_length=500)
 
 

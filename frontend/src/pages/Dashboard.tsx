@@ -55,7 +55,7 @@ export default function DashboardPage() {
             <tbody>
               {jobs.map((j) => (
                 <tr key={j.id} className="border-t" style={{ borderColor: 'var(--color-border)' }}>
-                  <td className="p-3"><Link to={`/app/jobs`} style={{ color: 'var(--color-link)' }}>#{j.id}</Link></td>
+                  <td className="p-3"><Link to={`/jobs`} style={{ color: 'var(--color-link)' }}>#{j.id}</Link></td>
                   <td className="p-3">{j.order_ref}</td>
                   <td className="p-3">#{j.machine_id}</td>
                   <td className="p-3"><StatusBadge status={j.status} /></td>

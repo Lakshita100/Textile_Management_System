@@ -1,0 +1,1 @@
+Illustrative yarn thumbnails for the Image File column in the 10,000-row dataset. Not official Everest Textile product photography.

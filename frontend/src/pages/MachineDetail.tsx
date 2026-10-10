@@ -35,7 +35,7 @@ export default function MachineDetailPage() {
   return (
     <div>
       <PageHeader title={`${machine.code} — ${machine.name}`} subtitle={`Machine #${machine.id} · ${machine.machine_type}`}>
-        <Link to="/app/machines" className="btn-secondary text-sm">← Back to machines</Link>
+        <Link to="/machines" className="btn-secondary text-sm">← Back to machines</Link>
       </PageHeader>
 
       <div className="grid md:grid-cols-2 gap-4 mb-6">

@@ -1,0 +1,17 @@
+{
+  "dataset_name": "Textile Production Scheduling and Machine Allocation Synthetic Dataset",
+  "synthetic": true,
+  "random_seed": 20261010,
+  "row_counts": {
+    "orders.csv": 10000,
+    "machines.csv": 28,
+    "production_history.csv": 10000,
+    "allocation_candidates.csv": 57349,
+    "machine_availability_calendar.csv": 15120
+  },
+  "machine_count": 28,
+  "order_count": 10000,
+  "production_history_count": 10000,
+  "allocation_candidate_count": 57349,
+  "warning": "Simulated records and labels are suitable for prototyping only, not proof of real-world predictive accuracy."
+}

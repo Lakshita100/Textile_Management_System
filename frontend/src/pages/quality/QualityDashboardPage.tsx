@@ -35,7 +35,7 @@ export default function QualityDashboardPage() {
       <PageHeader
         title="Quality Dashboard"
         actions={
-          <button type="button" className="btn-primary" onClick={openForm}>
+          <button type="button" className="btn-primary" onClick={() => openForm()}>
             New inspection
           </button>
         }
