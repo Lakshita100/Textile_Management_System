@@ -1,0 +1,117 @@
+@import "./theme.css";
+
+/* Global styles: import once from the frontend entry point. */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: light;
+  background: var(--color-background);
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-family-base);
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+a {
+  color: var(--color-link);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--color-heading);
+  line-height: 1.25;
+}
+
+hr,
+.border,
+table,
+input,
+select,
+textarea {
+  border-color: var(--color-border);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.page {
+  min-height: 100vh;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.surface {
+  background: var(--color-surface);
+}
+
+.card {
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-background);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1rem;
+}
+
+.btn-accent {
+  background: var(--color-accent);
+  color: var(--color-heading);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1rem;
+}
+
+.btn-secondary {
+  background: var(--color-background);
+  color: var(--color-heading);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1rem;
+}
+
+.table-header {
+  background: var(--color-surface);
+  color: var(--color-heading);
+}
+
+.muted {
+  color: var(--color-text);
+  opacity: 0.78;
+}
+
+/* Do not add arbitrary hex colors or gradients in component styles.
+   Prefer the approved variables above. */

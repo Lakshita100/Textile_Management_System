@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@import "./styles/global.css";
+
+/* Tailwind utilities mapped to the approved palette.
+   Single source of truth for colors: styles/theme.css. Never hardcode hex here. */
+@theme {
+  --color-action: var(--color-primary);
+  --color-highlight: var(--color-accent);
+  --color-canvas: var(--color-background);
+  --color-panel: var(--color-surface);
+  --color-title: var(--color-heading);
+  --color-copy: var(--color-text);
+  --color-line: var(--color-border);
+}

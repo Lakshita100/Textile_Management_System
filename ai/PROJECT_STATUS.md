@@ -27,15 +27,15 @@ Core demonstration flow: raw material → order → machine recommendation → p
 
 | Area | Status | Evidence / next action |
 |---|---|---|
-| Repository and existing code | Not audited | Inspect actual repo, package files, git status and tree |
-| Theme tokens / global CSS in actual app | Handoff specification provided; repo integration unverified | Copy/adapt CSS files and verify all UI uses tokens |
-| Frontend shell and navigation | Not audited | Inspect source and run frontend |
-| Dashboard and analytics | Not audited | Verify screens and data source |
+| Repository and existing code | Audited 2026-10-10 | FastAPI backend scaffold (config/db only, no endpoints); frontend was empty, now scaffolded with Vite + React + TS + Tailwind (npm) |
+| Theme tokens / global CSS in actual app | Implemented and verified (build/lint) | Copied to `frontend/src/styles/`; grep shows hex only in `theme.css`; no default Tailwind palette classes |
+| Frontend shell and navigation | Implemented, unverified (quality module only) | AppShell + routes in `frontend/src`; build/lint pass; no browser QA recorded; sidebar: 2 nav links + New Inspection button; other modules disabled |
+| Dashboard and analytics | Quality dashboard implemented (in-memory data, frontend only) | KPIs + charts in `pages/quality/QualityDashboardPage.tsx`; not connected to API |
+| Quality inspections | Frontend complete, no API | All Inspections list with filters (`/quality/inspections`) + New Inspection modal (`InspectionFormModal.tsx`, opened via `InspectionFormProvider`); in-memory store resets on reload; backend endpoints not implemented. Note: demo wording removed from UI per user request (2026-10-10), slightly relaxing AI_RULES' "label demo data" rule; seed data still commented as demo in service code |
 | Inventory and suppliers | Not audited | Verify CRUD, stock thresholds and persistence |
 | Orders | Not audited | Verify lifecycle and material checks |
 | Machine recommendation | Not audited | Verify hard eligibility checks, scoring and explanations |
 | Production tracking | Not audited | Verify planned/produced quantities and machine status |
-| Quality inspections | Not audited | Verify roll/order/machine traceability and outcomes |
 | Warehouse and shipments | Not audited | Verify finished rolls, shipment states and transaction safety |
 | Employee attendance / QR | Not audited | Verify duplicate-event protection and actual scanner behavior |
 | Accounts / costing / payments | Not audited | Verify calculations and data persistence |
