@@ -8,11 +8,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.auth import require_permission
 from app.schemas import AlertListOut, StockAlertOut
 from app.services import alerts
 from app.services.common import transaction
 
-router = APIRouter(prefix="/alerts", tags=["alerts"])
+router = APIRouter(prefix="/alerts", tags=["alerts"], dependencies=[Depends(require_permission("materials"))])
 
 
 @router.get("", response_model=AlertListOut, summary="List alerts enriched with yarn + supplier details")

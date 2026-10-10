@@ -13,7 +13,7 @@ Verified on the development machine during the 2026-10-10 audit. Commands are re
 | Git | 2.50.1.windows.1 | Repository initialized on `main` |
 | PostgreSQL | 17.9 server | Running on `localhost:5432`; service `postgresql-17` |
 | psql | `C:\Program Files\PostgreSQL\17\bin\psql.exe` | Not on PATH by default |
-| uvicorn / alembic | installed (global Scripts) | Not yet used — no app/migrations exist |
+| uvicorn / alembic | installed (global Scripts) | App and migrations are present; run them from `backend/` after configuring `.env` |
 
 Python packages pinned in `backend/requirements.txt` are installed globally, except:
 
@@ -29,27 +29,27 @@ Python packages pinned in `backend/requirements.txt` are installed globally, exc
 ## Environment variables
 
 - Commit **only** `.env.example` files. Real `.env` files are git-ignored (root `.gitignore`: `.env`, `.env.*`, with `!.env.example`).
-- `backend/.env.example` defines: `DATABASE_URL`, `SECRET_KEY`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `ALGORITHM`, `APP_NAME`, `API_PREFIX`, `DEBUG`, `BACKEND_CORS_ORIGINS`, `ENVIRONMENT`.
+- `backend/.env.example` defines: `DATABASE_URL`, `SECRET_KEY`, `ACCESS_TOKEN_EXPIRE_MINUTES`, `ALGORITHM`, `APP_NAME`, `API_PREFIX`, `DEBUG`, `BACKEND_CORS_ORIGINS`, `ENVIRONMENT`, `GOOGLE_CLIENT_ID`, `WORK_TIMEZONE`, and optional `INITIAL_ADMIN_*`.
 - Frontend will use only an API base URL (e.g. `VITE_API_BASE_URL=http://localhost:8000/api/v1`). Database credentials are never exposed to the frontend.
-- JWT/`SECRET_KEY` values are **placeholders** — authentication is not implemented; real deployment requires tested auth, RBAC, audit logs and backups.
+- Set a unique `SECRET_KEY` in backend/.env. Outside development the API refuses the placeholder or keys shorter than 32 characters. Set `INITIAL_ADMIN_PASSWORD` before seeding the first administrator.
 
-## Planned setup commands (not yet executable — app shell missing)
+## Setup commands
 
 ```bash
-# Backend (once app/main.py and Alembic exist)
+# Backend
 cd backend
 pip install -r requirements.txt
 cp .env.example .env         # then edit credentials
 alembic upgrade head
 uvicorn app.main:app --reload   # API docs: http://localhost:8000/docs
 
-# Frontend (once scaffolded)
+# Frontend
 cd frontend
 npm install
 npm run dev                  # http://localhost:5173
 ```
 
-## Test commands (current reality)
+## Test commands
 
 | Command | Working directory | Current result |
 |---|---|---|

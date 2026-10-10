@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  CalendarCheck2,
   Boxes,
   ClipboardList,
   Cpu,
@@ -23,6 +24,7 @@ export interface NavItem {
   icon: LucideIcon;
   /** Match the path exactly (used by the dashboard home route). */
   exact?: boolean;
+  permission?: string;
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -33,6 +35,7 @@ export const NAV_ITEMS: NavItem[] = [
     path: '/dashboard',
     icon: LayoutDashboard,
     exact: true,
+    permission: 'production',
   },
   {
     label: 'Yarn Inventory',
@@ -40,6 +43,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Inventory',
     path: '/inventory',
     icon: Boxes,
+    permission: 'materials',
   },
   {
     label: 'Low-Stock Alerts',
@@ -47,6 +51,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Alerts',
     path: '/alerts',
     icon: TriangleAlert,
+    permission: 'materials',
   },
   {
     label: 'Stock Movements',
@@ -54,6 +59,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Movements',
     path: '/movements',
     icon: ArrowLeftRight,
+    permission: 'materials',
   },
   {
     label: 'Suppliers',
@@ -61,6 +67,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Suppliers',
     path: '/suppliers',
     icon: Truck,
+    permission: 'materials',
   },
   {
     label: 'Purchase Requests',
@@ -68,6 +75,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Purchases',
     path: '/purchases',
     icon: ClipboardList,
+    permission: 'materials',
   },
   {
     label: 'Machines',
@@ -75,6 +83,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Machines',
     path: '/machines',
     icon: Cpu,
+    permission: 'machines',
   },
   {
     label: 'Production Jobs',
@@ -82,6 +91,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Production',
     path: '/jobs',
     icon: Activity,
+    permission: 'production',
   },
   {
     label: 'Recommendations',
@@ -89,6 +99,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Scheduling',
     path: '/recommend',
     icon: Sparkles,
+    permission: 'recommendations',
   },
   {
     label: 'Packing',
@@ -96,6 +107,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Quality',
     path: '/quality/packing',
     icon: ClipboardList,
+    permission: 'quality',
   },
   {
     label: 'Dispatch',
@@ -103,6 +115,7 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Quality',
     path: '/quality/dispatch',
     icon: Truck,
+    permission: 'dispatch',
   },
   {
     label: 'Quality Control',
@@ -110,6 +123,15 @@ export const NAV_ITEMS: NavItem[] = [
     module: 'Quality',
     path: '/quality',
     icon: ShieldCheck,
+    permission: 'quality',
+  },
+  {
+    label: 'Attendance',
+    crumb: 'Attendance',
+    module: 'Attendance',
+    path: '/attendance',
+    icon: CalendarCheck2,
+    permission: 'attendance',
   },
 ];
 

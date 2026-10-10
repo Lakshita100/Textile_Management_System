@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.auth import require_permission
 from app.models.machine import Machine
 from app.models.production import (
     MachineDowntime,
@@ -26,7 +27,7 @@ from app.services import machines as machine_service
 from app.services import production as production_service
 from app.services.machines import MachineRuleError
 
-router = APIRouter(prefix="/production", tags=["production"])
+router = APIRouter(prefix="/production", tags=["production"], dependencies=[Depends(require_permission("production"))])
 
 
 def _get_job(db: Session, job_id: int) -> ProductionJob:

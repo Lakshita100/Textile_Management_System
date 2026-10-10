@@ -2,21 +2,21 @@ import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Info, Loader2 } from 'lucide-react'
 import { buttonClass } from '../components/ui/Button'
-import { demoCredentials, getCurrentSession } from '../services/orderService'
+import GoogleSignInButton from '../components/auth/GoogleSignInButton'
+import { getCurrentSession } from '../services/orderService'
 import { useAuth } from '../store/AuthProvider'
 import { errorMessage } from '../services/http'
+import { homePathForUser } from '../services/authService'
 
 export function BuyerLoginPage() {
   const navigate = useNavigate()
-  const { signIn, user, loading } = useAuth()
+  const { signIn, signInWithGoogle, user, loading } = useAuth()
   const currentSession = getCurrentSession()
-  const [email, setEmail] = useState(demoCredentials.buyer.email)
-  const [password, setPassword] = useState(demoCredentials.buyer.password)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({})
-
-  const homeFor = (role: string) => (role === 'admin' ? '/admin' : role === 'staff' ? '/dashboard' : '/buyer')
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -31,7 +31,7 @@ export function BuyerLoginPage() {
     setSubmitting(true)
     try {
       const account = await signIn(email.trim().toLowerCase(), password)
-      navigate(homeFor(account.role), { replace: true })
+      navigate(homePathForUser(account), { replace: true })
     } catch (error) {
       setErrors({ form: errorMessage(error) })
     } finally {
@@ -39,8 +39,17 @@ export function BuyerLoginPage() {
     }
   }
 
+  const handleGoogleCredential = async (credential: string) => {
+    try {
+      const account = await signInWithGoogle(credential)
+      navigate(homePathForUser(account), { replace: true })
+    } catch (error) {
+      setErrors({ form: errorMessage(error) })
+    }
+  }
+
   if (!loading && user) {
-    return <Navigate to={homeFor(user.role)} replace />
+    return <Navigate to={homePathForUser(user)} replace />
   }
   if (!loading && !user && currentSession && currentSession.role === 'buyer') {
     // Legacy portal session without a backend token — send them to re-auth.
@@ -63,9 +72,7 @@ export function BuyerLoginPage() {
               </p>
             </div>
             <div className="mt-8 rounded-2xl border border-white/20 bg-white/5 p-4 text-sm text-white/80">
-              <p className="font-semibold text-white">Demo accounts (seeded on the backend)</p>
-              <p className="mt-2">Buyer: {demoCredentials.buyer.email} / {demoCredentials.buyer.password}</p>
-              <p>Admin: {demoCredentials.admin.email} / {demoCredentials.admin.password}</p>
+              Buyers sign in with their email. Employees and administrators use the unique ID provided by the administrator on the factory sign-in page.
             </div>
           </div>
 
@@ -131,6 +138,8 @@ export function BuyerLoginPage() {
                 )}
               </button>
             </form>
+            <div className="my-5 flex items-center gap-3 text-xs text-muted"><span className="h-px flex-1 bg-line" />or buyer sign-in<span className="h-px flex-1 bg-line" /></div>
+            <GoogleSignInButton onCredential={handleGoogleCredential} />
           </div>
         </div>
       </div>

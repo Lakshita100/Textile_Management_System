@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.auth import require_permission
 from app.models.machine import Machine, MachineStatus, MachineStatusEvent
 from app.models.production import ProductionJob, ProductionJobStatus
 from app.schemas.common import Page
@@ -19,7 +20,7 @@ from app.schemas.machine import (
 from app.services import machines as machine_service
 from app.services.machines import MachineRuleError
 
-router = APIRouter(prefix="/machines", tags=["machines"])
+router = APIRouter(prefix="/machines", tags=["machines"], dependencies=[Depends(require_permission("machines"))])
 
 
 def _assignment_out(job: ProductionJob) -> CurrentAssignmentOut:

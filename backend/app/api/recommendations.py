@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.auth import require_permission
 from app.config import settings
 from app.models.machine import Machine
 from app.models.production import ProductionJob
@@ -20,7 +21,7 @@ from app.services import production as production_service
 from app.services import recommendation as rec_service
 from app.services.machines import MachineRuleError
 
-router = APIRouter(tags=["recommendations"])
+router = APIRouter(tags=["recommendations"], dependencies=[Depends(require_permission("recommendations"))])
 
 
 def _to_out(rec: MachineRecommendation) -> RecommendationOut:

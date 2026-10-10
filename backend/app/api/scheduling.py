@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
+from app.api.auth import require_permission
 from app.models.machine import Machine
 from app.models.production import MachineDowntime
 from app.schemas.scheduling import (
@@ -17,7 +18,7 @@ from app.schemas.scheduling import (
 from app.services import duration as duration_service
 from app.services import scheduling as scheduling_service
 
-router = APIRouter(prefix="/scheduling", tags=["scheduling"])
+router = APIRouter(prefix="/scheduling", tags=["scheduling"], dependencies=[Depends(require_permission("recommendations"))])
 
 
 @router.post("/estimate-duration", response_model=DurationEstimateOut)

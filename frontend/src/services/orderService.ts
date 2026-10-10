@@ -51,7 +51,6 @@ export interface BuyerUser {
   contactName: string
   email: string
   phone: string
-  passwordHash: string
   address: string
   city: string
   country: string
@@ -135,14 +134,6 @@ const STORAGE_KEYS = {
   orders: 'everest-orders',
   inquiries: 'everest-inquiries',
   session: 'everest-demo-session',
-}
-
-const hashPassword = (value: string) => {
-  if (typeof window === 'undefined') {
-    return value
-  }
-
-  return btoa(unescape(encodeURIComponent(value)))
 }
 
 const isoNow = () => new Date().toISOString()
@@ -248,7 +239,6 @@ const seedBuyers = (): BuyerUser[] => [
     contactName: 'Aisha Rahman',
     email: 'buyer@everestmills.com',
     phone: '+91 98765 43210',
-    passwordHash: hashPassword('Demo@1234'),
     address: '14 Market Road, Andheri East',
     city: 'Mumbai',
     country: 'India',
@@ -262,24 +252,11 @@ const seedBuyers = (): BuyerUser[] => [
     contactName: 'Riya Mehta',
     email: 'riya@bluepeak.app',
     phone: '+91 99887 66554',
-    passwordHash: hashPassword('Bluepeak@321'),
     address: '93 Textile Avenue, Ring Road',
     city: 'Surat',
     country: 'India',
     businessRegistration: 'GSTIN: 24ABCDQ1234F1Z5',
     createdAt: '2026-09-10T10:00:00.000Z',
-  },
-  {
-    id: 'admin-1',
-    companyName: 'Everest Textile Mills',
-    contactName: 'Ram',
-    email: 'admin@everestmills.com',
-    phone: '+91 90000 11111',
-    passwordHash: hashPassword('Admin@1234'),
-    address: 'Factory Campus, Wardha Road',
-    city: 'Nagpur',
-    country: 'India',
-    createdAt: '2026-08-12T09:00:00.000Z',
   },
 ]
 
@@ -411,68 +388,35 @@ export const getBuyerById = (buyerId: string) => {
   return getAllBuyers().find((buyer) => buyer.id === buyerId)
 }
 
-export const signInDemo = (email: string, password: string) => {
-  const normalizedEmail = email.trim().toLowerCase()
-  const users = getAllBuyers()
-  const user = users.find((entry) => entry.email.toLowerCase() === normalizedEmail)
-
-  if (!user) {
-    return null
-  }
-
-  const passwordHash = hashPassword(password)
-  if (user.passwordHash !== passwordHash) {
-    return null
-  }
-
-  const role = user.email.toLowerCase() === 'admin@everestmills.com' ? 'admin' : 'buyer'
-  const session: SessionUser = {
-    userId: user.id,
-    role,
-    name: user.contactName,
-    email: user.email,
-    companyName: user.companyName,
-  }
-
-  setCurrentSession(session)
-  return session
-}
-
-export const registerBuyer = (payload: Omit<BuyerUser, 'id' | 'createdAt' | 'passwordHash'> & { password: string }) => {
+/** Keep the local order prototype's buyer profile aligned with the authenticated account. */
+export const syncAuthenticatedBuyer = (account: {
+  id: number
+  full_name: string
+  email: string | null
+  company: string | null
+  phone: string | null
+}) => {
+  if (!account.email) return
+  const id = `user-${account.id}`
   const buyers = getAllBuyers()
-  const emailExists = buyers.some((buyer) => buyer.email.toLowerCase() === payload.email.trim().toLowerCase())
-
-  if (emailExists) {
-    throw new Error('An account already exists for this email address.')
+  const existing = buyers.find((buyer) => buyer.id === id)
+  const profile: BuyerUser = {
+    id,
+    companyName: account.company ?? existing?.companyName ?? '',
+    contactName: account.full_name,
+    email: account.email,
+    phone: account.phone ?? existing?.phone ?? '',
+    address: existing?.address ?? '',
+    city: existing?.city ?? '',
+    country: existing?.country ?? '',
+    website: existing?.website,
+    businessRegistration: existing?.businessRegistration,
+    createdAt: existing?.createdAt ?? isoNow(),
   }
-
-  const user: BuyerUser = {
-    id: `buyer-${Date.now()}`,
-    companyName: payload.companyName,
-    contactName: payload.contactName,
-    email: payload.email,
-    phone: payload.phone,
-    passwordHash: hashPassword(payload.password),
-    address: payload.address,
-    city: payload.city,
-    country: payload.country,
-    website: payload.website,
-    businessRegistration: payload.businessRegistration,
-    createdAt: isoNow(),
-  }
-
-  buyers.push(user)
+  const index = buyers.findIndex((buyer) => buyer.id === id)
+  if (index === -1) buyers.push(profile)
+  else buyers[index] = profile
   writeStored(STORAGE_KEYS.buyers, buyers)
-
-  const session: SessionUser = {
-    userId: user.id,
-    role: 'buyer',
-    name: user.contactName,
-    email: user.email,
-    companyName: user.companyName,
-  }
-  setCurrentSession(session)
-  return session
 }
 
 export const getOrdersForBuyer = (buyerId: string) => {
@@ -808,9 +752,4 @@ export const updateBuyerProfile = (buyerId: string, updates: Partial<BuyerUser>)
   }
 
   return updatedBuyer
-}
-
-export const demoCredentials = {
-  buyer: { email: 'buyer@everestmills.com', password: 'Demo@1234' },
-  admin: { email: 'admin@everestmills.com', password: 'Admin@1234' },
 }

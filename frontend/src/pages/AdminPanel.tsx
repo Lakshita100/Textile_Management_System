@@ -22,6 +22,8 @@ const adminNav = [
   { to: '/admin/incoming', label: 'Incoming Orders', end: false },
   { to: '/admin/manual-order', label: 'Create Manual Order', end: false },
   { to: '/admin/inquiries', label: 'Order Inquiries', end: false },
+  { to: '/admin/employees', label: 'Employee Access', end: false },
+  { to: '/admin/attendance', label: 'Attendance Register', end: false },
   { to: '/admin/materials', label: 'Raw Materials', end: false },
   { to: '/admin/production', label: 'Production Management', end: false },
   { to: '/admin/machines', label: 'Machine Management', end: false },
@@ -43,7 +45,10 @@ export function AdminRouteGuard() {
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/signin" replace />
+  }
+  if (user.must_change_password) {
+    return <Navigate to="/change-password" replace />
   }
   if (user.role !== 'admin') {
     return <Navigate to={user.role === 'buyer' ? '/buyer' : '/dashboard'} replace />
@@ -195,6 +200,12 @@ export function AdminOverviewPage() {
             </Link>
             <Link to="/admin/machines" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
               Machine Management <ArrowRight className="h-4 w-4 text-primary" />
+            </Link>
+            <Link to="/admin/employees" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
+              Employee Access <ArrowRight className="h-4 w-4 text-primary" />
+            </Link>
+            <Link to="/admin/attendance" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
+              Attendance Register <ArrowRight className="h-4 w-4 text-primary" />
             </Link>
           </div>
         </div>
