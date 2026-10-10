@@ -6,7 +6,7 @@
 
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 
-const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class ApiError extends Error {
   readonly status: number;
