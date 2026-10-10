@@ -162,7 +162,7 @@ export default function AllInspectionsPage() {
                     <td className="px-4 py-2">{insp.inspectedAt}</td>
                     <td className="px-4 py-2">
                       <Link
-                        to={`/jobs?job=${insp.jobId}`}
+                        to={`/app/jobs?job=${insp.jobId}`}
                         className="font-medium text-action hover:underline"
                         title={`Open production job #${insp.jobId}`}
                       >

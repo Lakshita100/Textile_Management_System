@@ -9,7 +9,7 @@ const qualityNav = [
 ]
 
 const otherModules: { label: string; to?: string }[] = [
-  { label: 'Production & Machines', to: '/' },
+  { label: 'Production & Machines', to: '/app' },
   { label: 'Inventory & Suppliers' },
   { label: 'Orders' },
   { label: 'Warehouse & Dispatch' },
