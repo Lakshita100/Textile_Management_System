@@ -1,22 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { machinesApi, apiErrorMessage } from '../services/api';
-import type { MachineDetail, StatusEvent } from '../types';
+import { machinesApi, schedulingApi, apiErrorMessage } from '../services/api';
+import type { MachineDetail, MachineTimelineOut, StatusEvent } from '../types';
 import { ErrorAlert, Loading, PageHeader, ProgressBar, StatusBadge } from '../components/ui';
 
 export default function MachineDetailPage() {
   const { id } = useParams();
   const [machine, setMachine] = useState<MachineDetail | null>(null);
   const [events, setEvents] = useState<StatusEvent[]>([]);
+  const [timeline, setTimeline] = useState<MachineTimelineOut | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const mid = Number(id);
-    Promise.all([machinesApi.get(mid), machinesApi.statusEvents(mid)])
-      .then(([m, e]) => {
+    Promise.all([machinesApi.get(mid), machinesApi.statusEvents(mid), schedulingApi.machineTimeline(mid)])
+      .then(([m, e, t]) => {
         setMachine(m);
         setEvents(e);
+        setTimeline(t);
       })
       .catch((e) => setError(apiErrorMessage(e)))
       .finally(() => setLoading(false));
@@ -25,6 +27,10 @@ export default function MachineDetailPage() {
   if (loading) return <Loading />;
   if (error) return <ErrorAlert message={error} />;
   if (!machine) return null;
+
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const fmtMin = (v: number) => (v >= 90 ? `${(v / 60).toFixed(1)} h` : `${Math.round(v)} min`);
 
   return (
     <div>
@@ -60,6 +66,47 @@ export default function MachineDetailPage() {
             <p className="text-sm muted">No active assignment.</p>
           )}
         </div>
+      </div>
+
+      <div className="card p-4 mb-6">
+        <div className="flex flex-wrap items-baseline gap-3 mb-3">
+          <h2 className="font-semibold" style={{ color: 'var(--color-heading)' }}>Schedule timeline (14-day horizon)</h2>
+          {timeline && (
+            <span className="text-xs muted">
+              next available {fmt(timeline.next_available_at)}
+              {timeline.open_downtime_count > 0 && ` · ${timeline.open_downtime_count} open downtime (end unknown)`}
+            </span>
+          )}
+        </div>
+        {!timeline || timeline.busy_intervals.length === 0 ? (
+          <p className="text-sm muted">No committed jobs in the horizon — machine is free (fixture/development data).</p>
+        ) : (
+          <ul className="text-sm divide-y" style={{ borderColor: 'var(--color-border)' }}>
+            {timeline.busy_intervals.map((iv) => (
+              <li key={`${iv.kind}-${iv.job_id}`} className="py-2 flex flex-wrap items-center gap-2">
+                <StatusBadge status={iv.kind === 'active_job' ? 'IN_PROGRESS' : 'PLANNED'} />
+                <span className="font-medium">{iv.order_ref}</span>
+                <span className="text-xs muted">
+                  {iv.kind === 'active_job' ? 'active (est. remainder)' : 'planned'} ·
+                  {' '}{fmt(iv.start)} → {fmt(iv.end)} · {fmtMin(iv.minutes)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {timeline && timeline.warnings.length > 0 && (
+          <ul className="text-xs muted list-disc pl-5 mt-2">
+            {timeline.warnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        )}
+        {timeline && timeline.assumptions.length > 0 && (
+          <details className="mt-2">
+            <summary className="text-xs muted cursor-pointer">Assumptions</summary>
+            <ul className="text-xs muted list-disc pl-5 mt-1">
+              {timeline.assumptions.map((a, i) => <li key={i}>{a}</li>)}
+            </ul>
+          </details>
+        )}
       </div>
 
       <div className="card p-4">

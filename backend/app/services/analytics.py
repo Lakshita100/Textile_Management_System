@@ -6,7 +6,8 @@
 - utilization_percent: productive minutes (job actual_start..actual_end or downtime-adjusted span)
   divided by scheduled minutes (planned_start..planned_end); None when planned window missing.
 - downtime_minutes: sum of recorded downtime durations (closed events) for the machine/window.
-- defect_rate_percent: only from real quality data when available; None otherwise (never fabricated).
+- defect_rate_percent: from persisted quality inspections only (defects /
+  inspected metres x 100) when history exists; None + note otherwise (never fabricated).
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models.machine import Machine
 from app.models.production import MachineDowntime, ProductionJob, ProductionJobStatus
+from app.services import quality as quality_service
 
 
 def _job_window_filter(q, date_from: datetime | None, date_to: datetime | None):
@@ -81,6 +83,12 @@ def machine_analytics(
             total_dt += dur
             reasons[d.reason] = round(reasons.get(d.reason, 0.0) + dur, 2)
 
+        # Quality: real rate from persisted inspections; None + note when history
+        # is missing (never fabricated). Window uses the inspection date.
+        defect_rate, defect_note = quality_service.machine_defect_rate(
+            db, machine.id, date_from=date_from, date_to=date_to
+        )
+
         results.append(
             {
                 "machine_id": machine.id,
@@ -95,8 +103,8 @@ def machine_analytics(
                 "utilization_percent": utilization,
                 "downtime_minutes": round(total_dt, 2),
                 "downtime_reasons": reasons,
-                "defect_rate_percent": None,
-                "defect_note": "Quality history unavailable (Anand's contract pending) — not fabricated",
+                "defect_rate_percent": defect_rate,
+                "defect_note": defect_note,
             }
         )
     return results

@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import PageHeader from '../../components/ui/PageHeader'
 import { EmptyState, ErrorState, LoadingState } from '../../components/ui/StateViews'
 import { useAsync } from '../../hooks/useAsync'
 import { useInspectionForm } from '../../store/inspectionFormContext'
-import { getInspections, getMachineName, getMachines } from '../../services/qualityService'
+import { getInspections, getMachines } from '../../services/qualityService'
 import { EMPLOYEES } from '../../services/employeeService'
 
 export default function AllInspectionsPage() {
   const { openForm } = useInspectionForm()
-  const [searchInput, setSearchInput] = useState('')
-  const [search, setSearch] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const jobFilter = Number(searchParams.get('job')) || undefined
+  const [searchInput, setSearchInput] = useState(searchParams.get('search') ?? '')
+  const [search, setSearch] = useState(searchParams.get('search') ?? '')
   const [machineId, setMachineId] = useState('All')
   const [inspectorId, setInspectorId] = useState('All')
 
@@ -18,10 +21,10 @@ export default function AllInspectionsPage() {
     return () => clearTimeout(timer)
   }, [searchInput])
 
-  const machines = getMachines()
+  const machines = useAsync(() => getMachines(), [])
   const inspections = useAsync(
-    () => getInspections({ search, machineId }),
-    [search, machineId],
+    () => getInspections({ search, machineId, jobId: jobFilter }),
+    [search, machineId, jobFilter],
   )
 
   const rows = (inspections.data ?? []).filter((i) => inspectorId === 'All' || i.employeeId === inspectorId)
@@ -31,8 +34,9 @@ export default function AllInspectionsPage() {
     setSearch('')
     setMachineId('All')
     setInspectorId('All')
+    if (jobFilter) setSearchParams({})
   }
-  const hasFilters = search !== '' || machineId !== 'All' || inspectorId !== 'All'
+  const hasFilters = search !== '' || machineId !== 'All' || inspectorId !== 'All' || Boolean(jobFilter)
 
   return (
     <div>
@@ -74,7 +78,7 @@ export default function AllInspectionsPage() {
             onChange={(e) => setMachineId(e.target.value)}
           >
             <option value="All">All machines</option>
-            {machines.map((m) => (
+            {(machines.data ?? []).map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name} ({m.id})
               </option>
@@ -105,6 +109,17 @@ export default function AllInspectionsPage() {
           </button>
         </div>
       </form>
+
+      {jobFilter ? (
+        <div className="card mb-5 flex items-center justify-between gap-3 px-4 py-2 text-sm" role="status">
+          <span>
+            Filtered by production job <span className="font-semibold text-title">#{jobFilter}</span>
+          </span>
+          <button type="button" className="font-medium text-action" onClick={clearFilters}>
+            Show all inspections
+          </button>
+        </div>
+      ) : null}
 
       <section className="card min-w-0 overflow-hidden" aria-label="Inspection list">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
@@ -143,21 +158,23 @@ export default function AllInspectionsPage() {
               <tbody>
                 {rows.map((insp) => (
                   <tr key={insp.id} className="border-b border-line hover:bg-panel">
-                    <td className="px-4 py-2 font-medium text-title">
-                      {insp.id}
-                      {insp.source === 'session-entry' ? (
-                        <span className="ml-2 rounded-sm border border-line px-1 py-0.5 text-[10px] font-semibold uppercase muted">
-                          new
-                        </span>
-                      ) : null}
-                    </td>
+                    <td className="px-4 py-2 font-medium text-title">#{insp.id}</td>
                     <td className="px-4 py-2">{insp.inspectedAt}</td>
                     <td className="px-4 py-2">
-                      {insp.rollId}
+                      <Link
+                        to={`/jobs?job=${insp.jobId}`}
+                        className="font-medium text-action hover:underline"
+                        title={`Open production job #${insp.jobId}`}
+                      >
+                        {insp.rollId}
+                      </Link>
                       <span className="muted ml-1 text-xs">{insp.batchNo}</span>
                     </td>
                     <td className="px-4 py-2">{insp.orderId}</td>
-                    <td className="px-4 py-2">{getMachineName(insp.machineId)}</td>
+                    <td className="px-4 py-2">
+                      {insp.machineName}
+                      <span className="muted ml-1 text-xs">{insp.machineId}</span>
+                    </td>
                     <td className="px-4 py-2">
                       {insp.inspectorName}
                       <span className="muted ml-1 text-xs">{insp.employeeId}</span>

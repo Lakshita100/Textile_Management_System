@@ -3,15 +3,18 @@ import type {
   AnalyticsRow,
   Dashboard,
   Downtime,
+  DurationEstimateOut,
   Job,
   JobDetail,
   Machine,
   MachineDetail,
   MachineListItem,
+  MachineTimelineOut,
   Page,
   Recommendation,
   StatusEvent,
 } from '../types';
+import type { ActiveJobWire, DashboardBundleWire, InspectionWire } from '../types/quality';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1',
@@ -71,4 +74,57 @@ export const recommendationsApi = {
 export const analyticsApi = {
   query: (params: { date_from?: string; date_to?: string; machine_id?: number }) =>
     api.get<AnalyticsRow[]>('/production/analytics', { params }).then((r) => r.data),
+};
+
+export const schedulingApi = {
+  estimateDuration: (body: {
+    machine_id: number;
+    quantity: number;
+    unit?: string;
+    process: string;
+    gsm?: number;
+    width_cm?: number;
+    fabric_type?: string;
+    priority?: string;
+  }) => api.post<DurationEstimateOut>('/scheduling/estimate-duration', body).then((r) => r.data),
+  machineTimeline: (id: number) =>
+    api.get<MachineTimelineOut>(`/scheduling/machines/${id}/timeline`).then((r) => r.data),
+};
+
+export const qualityApi = {
+  inspections: (params: {
+    search?: string;
+    outcome?: string;
+    machine_code?: string;
+    employee_id?: string;
+    job_id?: number;
+    page?: number;
+    page_size?: number;
+  }) => api.get<Page<InspectionWire>>('/quality/inspections', { params }).then((r) => r.data),
+  inspection: (id: number) => api.get<InspectionWire>(`/quality/inspections/${id}`).then((r) => r.data),
+  createInspection: (body: {
+    job_id: number;
+    employee_id: string;
+    inspector_name: string;
+    inspected_at: string;
+    inspected_qty_meters: number;
+    defects: { type: string; count: number; severity: string; remarks?: string }[];
+    remarks?: string;
+    machine_code?: string;
+    order_ref?: string;
+    batch_no?: string;
+  }) => api.post<InspectionWire>('/quality/inspections', body).then((r) => r.data),
+  updateInspection: (id: number, body: { outcome?: string; remarks?: string }) =>
+    api.patch<InspectionWire>(`/quality/inspections/${id}`, body).then((r) => r.data),
+  dashboard: () => api.get<DashboardBundleWire>('/quality/dashboard').then((r) => r.data),
+  rollPreview: (jobId: number) =>
+    api.get<{ job_id: number; batch_no: string; roll_id: string; inspection_count: number }>(
+      `/quality/jobs/${jobId}/roll-preview`,
+    ).then((r) => r.data),
+  inspectableJob: (machineId: number) =>
+    api.get<ActiveJobWire | null>(`/quality/machines/${machineId}/inspectable-job`).then((r) => r.data),
+  inspectionCounts: () =>
+    api.get<{ job_id: number; count: number; latest_inspection_id: number | null }[]>(
+      '/quality/inspection-counts',
+    ).then((r) => r.data),
 };

@@ -2,14 +2,14 @@
 
 **Convention:** base prefix `/api/v1`, plural resource names, standard HTTP methods, Pydantic-validated payloads, consistent error shape, pagination on list endpoints, CORS for the local frontend, OpenAPI served by FastAPI.
 
-**Current state (2026-10-10):** no API is implemented in this repository (no FastAPI `main.py`, no routers). Everything below is a **proposed contract for Feature 02**, to be confirmed in Phase 1 together with the team's shared conventions. Paths are proposals, not guarantees.
+**Current state (2026-10-10):** Feature 02 endpoints, ML scheduling endpoints and the Module 03 quality endpoints below are implemented and live-verified (`/api/v1`, OpenAPI at `/api/v1/openapi.json`). Module 01/04 remain FIXTURE adapters.
 
 ## Status of cross-module contracts
 
 | Module | Owner | Contract status |
 |---|---|---|
 | Module 01 — Raw materials / inventory | Maahi | Not published |
-| Module 03 — Quality inspections | Anand | Not published |
+| Module 03 — Quality inspections | Anand | **Implemented in this repository** (persistent backend under `/api/v1/quality`, integrated 2026-10-10; his terminology and outcome enum preserved) |
 | Module 04 — Orders | Ram | Not published |
 
 Integration points Feature 02 will need (see `DATA_SOURCES_AND_INTEGRATION.md`): order specs + deadline; material availability; machine-linked quality history. Until owners publish contracts, these remain open items — any interim mock requires explicit approval and clear labelling.
@@ -71,6 +71,21 @@ Machine status enum (proposed): `running` | `idle` | `maintenance`. Operational 
 | `GET /api/v1/recommendations/{id}` | Retrieve stored recommendation | Includes inputs, score components, `algorithm_version`, timestamp |
 | `POST /api/v1/recommendations/{id}/approve` | Supervisor approval | Revalidates material, machine status and schedule transactionally; persists assignment + decision; role check required |
 
+### Quality inspections (Module 03 × Feature 02 integration; owner: Anand contract / Lakshita wiring)
+
+| Method & path | Purpose | Notes |
+|---|---|---|
+| `GET /api/v1/quality/inspections` | List inspections | Filters: `machine_id`, `job_id`, `outcome`, `search`, pagination; joined machine name + job status |
+| `POST /api/v1/quality/inspections` | Create inspection against a job | Server derives batch/roll (`BATCH-{job_id}`, `BATCH-{job_id}-R{n}`), computes accepted qty and outcome (`Approved` iff 0 defects, else `Rework`) |
+| `GET /api/v1/quality/inspections/{id}` | Inspection detail | |
+| `PATCH /api/v1/quality/inspections/{id}` | Disposition update | Only `outcome` + `remarks` mutable; measurement/identity fields → `409 IMMUTABLE_FIELDS` |
+| `GET /api/v1/quality/dashboard` | Anand's dashboard bundle from the DB | stats + defect trend + defects by type + machine summaries + machine × defect matrix |
+| `GET /api/v1/quality/jobs/{job_id}/roll-preview` | Next roll id before submitting | |
+| `GET /api/v1/quality/machines/{id}/inspectable-job` | Active (or last completed-with-output) job for the form | |
+| `GET /api/v1/quality/inspection-counts` | `{job_id: count}` per job | Feeds the Jobs page Quality column |
+
+Business rules (all enforced server-side): inspectable only from `IN_PROGRESS`/`PAUSED`/`COMPLETED` with actual output > 0 (`409 JOB_NOT_INSPECTABLE` / `NO_OUTPUT_RECORDED`); inspected ≤ actual (`409 EXCEEDS_OUTPUT`); cross-checked `machine_code`/`order_ref`/`batch_no` mismatches → `409 MACHINE_MISMATCH` / `ORDER_MISMATCH` / `BATCH_MISMATCH`; unknown refs → `404`. Completion never equals approval; rework never auto-creates jobs; quality failures never cancel jobs.
+
 ### Shared platform (prerequisite; owner: Lakshita)
 
 | Method & path | Purpose |
@@ -85,6 +100,8 @@ Machine status enum (proposed): `running` | `idle` | `maintenance`. Operational 
 - Status transitions follow the agreed lifecycle; invalid transitions return `409`/`422` with a clear detail.
 - Material availability is a hard gate for scheduling; insufficient material → explicit failure, never a forced assignment.
 - All recommendation decisions persisted with algorithm version and actor.
+- Quality: inspection eligibility, quantity caps and cross-field identity checks as listed in the quality section; outcome is server-computed at create time.
+- Quality history feeds recommendation quality (neutral 50 + explicit warning below `REC_MIN_QUALITY_SAMPLES=3`) and analytics defect rate (`null` + "not fabricated" note when absent).
 
 ## Authentication / permissions
 

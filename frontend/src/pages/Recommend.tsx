@@ -1,7 +1,62 @@
 import { useState } from 'react';
 import { recommendationsApi, apiErrorMessage } from '../services/api';
-import type { Recommendation } from '../types';
+import type { Recommendation, ScheduleOut } from '../types';
 import { ErrorAlert, Loading, PageHeader, StatusBadge, SuccessAlert } from '../components/ui';
+
+function fmtMin(v: number): string {
+  if (v >= 90) return `${(v / 60).toFixed(1)} h`;
+  return `${Math.round(v)} min`;
+}
+
+function fmtTime(iso: string): string {
+  return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function ScheduleDetails({ s }: { s: ScheduleOut }) {
+  return (
+    <div className="mt-3 grid md:grid-cols-2 gap-4 text-sm border-t pt-3" style={{ borderColor: 'var(--color-border)' }}>
+      <dl className="grid grid-cols-2 gap-1.5">
+        <dt className="muted">Earliest start</dt><dd>{fmtTime(s.earliest_start_at)}</dd>
+        <dt className="muted">Setup / changeover</dt><dd>{fmtMin(s.setup_minutes)}</dd>
+        <dt className="muted">Processing</dt>
+        <dd>
+          {fmtMin(s.processing_minutes)}
+          <span className="text-xs muted ml-1">
+            ({s.processing_source === 'ml' ? 'ML estimate' : 'capacity rule'})
+          </span>
+        </dd>
+        <dt className="muted">Queue wait</dt><dd>{fmtMin(s.queue_wait_minutes)}</dd>
+        <dt className="muted">Completion</dt><dd className="font-medium">{fmtTime(s.completion_at)}</dd>
+        <dt className="muted">Next available</dt><dd>{fmtTime(s.next_available_at)}</dd>
+        <dt className="muted">Idle after job</dt><dd>{s.idle_after_minutes != null ? fmtMin(s.idle_after_minutes) : 'not predictable'}</dd>
+        <dt className="muted">Deadline</dt>
+        <dd>
+          {s.deadline_feasible == null ? 'no deadline' : s.deadline_feasible
+            ? <span style={{ color: 'var(--color-accent)' }}>on time</span>
+            : <span style={{ color: 'var(--color-heading)' }}>late by {fmtMin(s.lateness_minutes ?? 0)}</span>}
+        </dd>
+      </dl>
+      <div className="space-y-2">
+        {s.assumptions.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold mb-1" style={{ color: 'var(--color-heading)' }}>Assumptions</p>
+            <ul className="text-xs muted list-disc pl-4 space-y-0.5">
+              {s.assumptions.map((a, i) => <li key={i}>{a}</li>)}
+            </ul>
+          </div>
+        )}
+        {s.warnings.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold mb-1" style={{ color: 'var(--color-heading)' }}>Warnings</p>
+            <ul className="text-xs muted list-disc pl-4 space-y-0.5">
+              {s.warnings.map((w, i) => <li key={i}>{w}</li>)}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function RecommendPage() {
   const [form, setForm] = useState({
@@ -52,7 +107,7 @@ export default function RecommendPage() {
     <div>
       <PageHeader
         title="Machine Recommendations"
-        subtitle="Explainable rule-based engine — 0.40×Efficiency + 0.35×Workload + 0.25×Quality (not trained ML)"
+        subtitle="Rule-based ranking + ML duration/scheduling estimates (experimental) — constraints always win"
       />
       {notice && <div className="mb-4"><SuccessAlert message={notice} /></div>}
       {error && <div className="mb-4"><ErrorAlert message={error} /></div>}
@@ -119,6 +174,14 @@ export default function RecommendPage() {
                 <span className="text-xs muted">revalidates material, status &amp; schedule before assigning</span>
               </div>
             )}
+            {rec.candidates.filter((c) => c.eligible && c.schedule).slice(0, 1).map((c) => (
+              <div key={c.machine_id}>
+                <p className="text-xs font-semibold mt-4 mb-1" style={{ color: 'var(--color-heading)' }}>
+                  Schedule estimate — {c.machine_code}
+                </p>
+                <ScheduleDetails s={c.schedule as ScheduleOut} />
+              </div>
+            ))}
           </div>
 
           <div className="card overflow-x-auto">
@@ -127,7 +190,10 @@ export default function RecommendPage() {
                 <tr className="table-header text-left">
                   <th className="p-3">Rank</th><th className="p-3">Machine</th><th className="p-3">Eligible</th>
                   <th className="p-3">Score</th><th className="p-3">Efficiency</th><th className="p-3">Workload</th>
-                  <th className="p-3">Quality</th><th className="p-3">Est. days</th><th className="p-3">Exclusions</th>
+                  <th className="p-3">Quality</th><th className="p-3">Est. days</th>
+                  <th className="p-3">Processing</th><th className="p-3">Start → Completion</th>
+                  <th className="p-3" title="Experimental machine-learning selection probability (synthetic data)">ML P(select)*</th>
+                  <th className="p-3">Exclusions</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,14 +205,30 @@ export default function RecommendPage() {
                     <td className="p-3 font-semibold">{c.score ? c.score.final_score : '—'}</td>
                     <td className="p-3">{c.score ? `${c.score.efficiency}${c.score.efficiency_known ? '%' : '* (unknown)'}` : '—'}</td>
                     <td className="p-3">{c.score ? `${c.score.workload_suitability}` : '—'}</td>
-                    <td className="p-3">{c.score ? `${c.score.quality}${c.score.quality_known ? '%' : '* (unknown)'}` : '—'}</td>
+                    <td className="p-3">
+                      {c.score ? `${c.score.quality}${c.score.quality_known ? '%' : '* (unknown)'}` : '—'}
+                      {c.warnings.length > 0 && (
+                        <div className="text-xs muted">{c.warnings.join('; ')}</div>
+                      )}
+                    </td>
                     <td className="p-3">{c.estimated_days ?? '—'}</td>
+                    <td className="p-3">
+                      {c.schedule
+                        ? <>{fmtMin(c.schedule.processing_minutes)}<div className="text-xs muted">{c.schedule.processing_source === 'ml' ? 'ML' : 'rule'}</div></>
+                        : '—'}
+                    </td>
+                    <td className="p-3 text-xs">
+                      {c.schedule
+                        ? <>{fmtTime(c.schedule.earliest_start_at)}<div className="muted">→ {fmtTime(c.schedule.completion_at)}</div></>
+                        : '—'}
+                    </td>
+                    <td className="p-3">{c.ml_selection_probability != null ? c.ml_selection_probability.toFixed(3) : '—'}</td>
                     <td className="p-3 text-xs muted">{c.exclusion_reasons.join('; ') || '—'}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <p className="p-3 text-xs muted">* unknown history → neutral {rec.candidates.find((c) => c.score && !c.score.efficiency_known) ? '50' : ''} fallback, never silently perfect. Eligibility always precedes scoring.</p>
+            <p className="p-3 text-xs muted">* unknown history → neutral 50 fallback, never silently perfect. Eligibility always precedes scoring. * ML P(select) is an experimental estimate from a model trained on SYNTHETIC data — it never overrides constraints or the rule score.</p>
           </div>
         </div>
       )}

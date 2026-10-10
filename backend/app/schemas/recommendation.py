@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.recommendation import RecommendationDecision
+from app.schemas.scheduling import ScheduleOut
 
 
 class RecommendationRequest(BaseModel):
@@ -32,6 +33,9 @@ class CandidateOut(BaseModel):
     exclusion_reasons: list[str] = []
     score: ScoreBreakdown | None = None
     estimated_days: float | None = None
+    schedule: ScheduleOut | None = None
+    ml_selection_probability: float | None = None
+    warnings: list[str] = []
 
 
 class RecommendationOut(BaseModel):
