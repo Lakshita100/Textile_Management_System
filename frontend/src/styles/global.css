@@ -1,0 +1,147 @@
+@import "tailwindcss";
+@import "./theme.css";
+
+/* Global styles: import once from the frontend entry point.
+   Team base rules live in @layer base and component rules in
+   @layer components so Tailwind utilities can override them. */
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: light;
+    background: var(--color-background);
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-family-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  a {
+    color: var(--color-link);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--color-heading);
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  hr,
+  table,
+  input,
+  select,
+  textarea {
+    border-color: var(--color-border);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .page {
+    min-height: 100vh;
+    background: var(--color-background);
+    color: var(--color-text);
+  }
+
+  .surface {
+    background: var(--color-surface);
+  }
+
+  .card {
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .btn-primary,
+  .btn-accent,
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    border-radius: var(--radius-button);
+    padding: 0.6rem 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
+
+  .btn-primary {
+    background: var(--color-primary-hover);
+    color: var(--color-background);
+    border: 1px solid var(--color-primary-hover);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+
+  .btn-accent {
+    background: var(--color-accent);
+    color: var(--color-heading);
+    border: 1px solid var(--color-accent);
+  }
+
+  .btn-secondary {
+    background: var(--color-background);
+    color: var(--color-heading);
+    border: 1px solid var(--color-border);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+  }
+
+  .table-header {
+    background: var(--color-table-header);
+    color: var(--color-heading);
+  }
+
+  .muted {
+    color: var(--color-text-muted);
+  }
+
+  .scrim {
+    background: color-mix(in srgb, var(--color-heading) 45%, transparent);
+  }
+}

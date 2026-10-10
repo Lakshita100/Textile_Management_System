@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy import create_engine, event, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
@@ -15,21 +15,39 @@ class Base(DeclarativeBase):
     pass
 
 
-# Synchronous engine for migrations and direct operations
-engine = create_engine(
-    settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    future=True,
-)
+def _build_engine(url: str) -> Engine:
+    """Create the engine with engine-specific connection options.
 
-# Async engine for async endpoints
-async_engine = create_async_engine(
-    settings.DATABASE_URL.replace("postgresql+psycopg2", "postgresql+asyncio"),
-    echo=settings.DEBUG,
-    future=True,
-)
+    SQLite (local demo): WAL journal + a busy timeout keep concurrent
+    requests from failing with "database is locked"; foreign keys are
+    enforced because SQLite disables them by default.
+    PostgreSQL (production): plain engine, no special connect args.
+    """
+    connect_args: dict = {}
+    if url.startswith("sqlite"):
+        connect_args = {"timeout": 30, "check_same_thread": False}
 
-# Session factories
+    engine = create_engine(
+        url,
+        echo=settings.ECHO_SQL,
+        future=True,
+        connect_args=connect_args,
+    )
+
+    if url.startswith("sqlite"):
+        @event.listens_for(engine, "connect")
+        def _configure_sqlite(dbapi_connection, _connection_record):  # noqa: ANN001
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
+    return engine
+
+
+engine = _build_engine(settings.DATABASE_URL)
+
 SessionLocal = sessionmaker(
     autocommit=False,
     autoflush=False,
@@ -37,27 +55,14 @@ SessionLocal = sessionmaker(
     class_=Session,
 )
 
-AsyncSessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=async_engine,
-    class_=AsyncSession,
-)
 
-
-def get_db() -> Session:
-    """Dependency for getting a synchronous database session."""
+def get_db():
+    """Dependency for getting a database session."""
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
-
-
-async def get_async_db() -> AsyncSession:
-    """Dependency for getting an asynchronous database session."""
-    async with AsyncSessionLocal() as session:
-        yield session
 
 
 def check_db_connection() -> bool:

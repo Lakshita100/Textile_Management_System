@@ -1,7 +1,7 @@
 # Project Status — Source of Truth
 
 **Last handoff-pack update:** 2026-10-10  
-**Repository audit:** Not performed — source-code repository was not supplied with this request.  
+**Repository audit:** Frontend audited 2026-10-10 — repo contained backend config, datasets, the `ai/` handoff pack and an **empty** `frontend/` scaffold (only `.gitkeep` files). Backend not audited.  
 **Overall implementation status:** **UNVERIFIED**. Do not infer completion from design reference images.
 
 ## Product scope from the MVP proposal
@@ -27,11 +27,11 @@ Core demonstration flow: raw material → order → machine recommendation → p
 
 | Area | Status | Evidence / next action |
 |---|---|---|
-| Repository and existing code | Not audited | Inspect actual repo, package files, git status and tree |
-| Theme tokens / global CSS in actual app | Handoff specification provided; repo integration unverified | Copy/adapt CSS files and verify all UI uses tokens |
-| Frontend shell and navigation | Not audited | Inspect source and run frontend |
-| Dashboard and analytics | Not audited | Verify screens and data source |
-| Inventory and suppliers | Not audited | Verify CRUD, stock thresholds and persistence |
+| Repository and existing code | Implemented, unverified | Audited 2026-10-10: `git log` (1 scaffold commit), `frontend/` was empty; React app did not exist before this session |
+| Theme tokens / global CSS in actual app | Implemented, unverified | `frontend/src/styles/theme.css` + `global.css` added; grep confirms hex only in `theme.css`; `npm run build` passes. Status/radius token extension awaits owner sign-off |
+| Frontend shell and navigation | Implemented, unverified | App shell, sidebar, topbar, router in `frontend/src/components/layout` + `App.tsx`; `npm run dev` ready and `/raw-materials` returned HTTP 200 on 2026-10-10; browser visual review pending |
+| Dashboard and analytics | Not audited | Placeholder route only; verify screens and data source |
+| Inventory and suppliers | In progress | Phase 2 done 2026-10-10: frontend-only Yarn Inventory (`/raw-materials`) with search (ID/name/product code), category + status filters, clear filters, matching counts, rule-derived stock statuses, computed demo summary cards, 10-row pagination, empty state. No CRUD forms, backend, persistence or CSV import yet (Phase 3+) |
 | Orders | Not audited | Verify lifecycle and material checks |
 | Machine recommendation | Not audited | Verify hard eligibility checks, scoring and explanations |
 | Production tracking | Not audited | Verify planned/produced quantities and machine status |
@@ -43,7 +43,7 @@ Core demonstration flow: raw material → order → machine recommendation → p
 | API integration | Not audited | Verify frontend requests reach backend |
 | Authentication / roles | Not audited | Verify actual enforcement, not just login UI |
 | CSV/XLSX exports | Not audited | Generate and open a real exported file |
-| Tests / lint / builds | Not audited | Run commands supported by repo and record outputs |
+| Tests / lint / builds | Partially verified | 2026-10-10: `npm run typecheck` (tsc) and `npm run build` (vite) both exit 0 in `frontend/`; Phase 2 pure-logic assertion suite passed via `node`; no lint/test script exists yet; backend tests not run |
 | Deployment / live integrations | Not audited | Confirm hosting, credentials and provider integrations |
 
 ## Rules for updating this document
