@@ -1,0 +1,15 @@
+fastapi==0.115.6
+uvicorn==0.34.0
+sqlalchemy==2.0.36
+alembic==1.18.4
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-multipart==0.0.20
+psycopg2-binary==2.9.10
+openpyxl==3.1.5
+qrcode==7.4.2
+pillow==11.3.0
+pytest==9.1.1
+pytest-asyncio==1.4.0
+httpx==0.28.1
+factory_boy==3.3.1
