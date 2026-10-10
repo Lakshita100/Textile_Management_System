@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart3, Factory, LayoutDashboard, ListChecks, Sparkles } from 'lucide-react';
+import { BarChart3, ClipboardCheck, Factory, LayoutDashboard, ListChecks, Sparkles } from 'lucide-react';
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -7,6 +7,7 @@ const nav = [
   { to: '/jobs', label: 'Production Board', icon: ListChecks, end: false },
   { to: '/recommend', label: 'Recommendations', icon: Sparkles, end: false },
   { to: '/analytics', label: 'Analytics', icon: BarChart3, end: false },
+  { to: '/quality', label: 'Quality', icon: ClipboardCheck, end: false },
 ];
 
 export default function Layout() {

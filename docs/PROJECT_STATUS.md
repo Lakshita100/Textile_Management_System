@@ -24,6 +24,7 @@ This file records only what has been inspected in the repository with evidence. 
 - Live end-to-end (uvicorn on `:8000`): machine create/status/history, job lifecycle, quantity progress, recommendation with eligibility exclusions + score breakdown + supervisor approval → job creation, insufficient-material rejection, analytics rows with honest `null` metrics where no data exists.
 - Dependency modules (Maahi/Anand/Ram) are still absent; Feature 02 consumes clearly-labeled **FIXTURE adapters** (`app/adapters/fixtures.py`) — never presented as live integrations.
 - Demo seed data (`backend/scripts/seed_demo.py`) is labeled DEVELOPMENT FIXTURES.
+- **Merge of `origin/anand` (Module 03 quality frontend, 2026-10-10):** branch based on `d9cd758` merged into `main` with 11 conflicts resolved — his `ai/` tracker edits kept local-only and ported into `docs/`; his frontend merged under `/quality` routes beside Feature 02's app; shared theme CSS identical on both branches. Post-merge: `npm run build` success (2277 modules), `npm test` 3 passed, `npm run lint` runs (2 pre-existing warnings).
 
 ## Status matrix
 
@@ -41,21 +42,22 @@ This file records only what has been inspected in the repository with evidence. 
 | Feature 02 — Machine Recommendation Engine | Implemented and verified | Rule-based scoring (0.40/0.35/0.25), eligibility gates before scoring, explanations, warnings, approval revalidation; live e2e verified |
 | Feature 02 — Performance & Quality-History Analytics | Implemented and verified (defect metric pending Anand) | `/production/analytics` returns per-machine output/efficiency/utilization/downtime; defect rate shown only from real quality data (none yet) |
 | Module 01 Raw Materials (Maahi) | Not implemented | Material gate served by labeled FIXTURE adapter |
-| Module 03 Quality (Anand) | Not implemented | Quality score/defect rate return neutral + warnings (never silent perfect) |
+| Module 03 Quality (Anand) | Frontend implemented (merged from `anand`) | Quality dashboard, All Inspections, modal inspection form, employee session switcher at `/quality`; build/lint verified by Anand and re-verified post-merge — **in-memory demo data only; backend wiring pending** |
 | Module 04 Orders (Ram) | Not implemented | Order refs served by labeled FIXTURE adapter |
 | Modules 05/06 (Warehouse, Employees/Accounts) | Not implemented | Owners TBD |
 | Authentication / RBAC | Not implemented | Config placeholders removed pending design; supervisor approval currently records approver name only |
 | Backend tests | Implemented and verified | `python -m pytest -q` → 29 passed |
-| Frontend tests / build | Implemented and verified | `npm test` → 3 passed; `npm run build` → success |
+| Frontend tests / build | Implemented and verified | `npm test` → 3 passed; `npm run build` → success (incl. merged quality module); `npm run lint` → oxlint active |
 | CI / deployment | Not implemented | Out of scope until MVP verified |
 
 ## Known risks
 
 1. **Feature 02 still depends on three modules (01/03/04) that do not exist in this repository.** FIXTURE adapters are labeled and swappable; contracts must be confirmed with Maahi, Anand and Ram before real integration (Phase 1 items remain open).
 2. **Auth/RBAC is not implemented.** Supervisor approval persists the approver name but there is no identity/role enforcement yet — required before real deployment.
-3. Analytics defect-rate and recommendation quality-score depend on Anand's `quality_inspections`; until then they are neutral fallbacks with visible warnings.
+3. Analytics defect-rate and recommendation quality-score depend on Anand's `quality_inspections`; until then they are neutral fallbacks with visible warnings. Anand's quality frontend now exists but stores data **in memory (resets on reload)** — inspection CRUD + machine-job endpoints must be built to replace the demo services.
 4. Demo/seed rows (DEVELOPMENT FIXTURES) and earlier manual test rows live in the local PostgreSQL database; a fresh clone must run `alembic upgrade head` (and optionally the seed script).
 5. Optional ML (Stage 7 / `dataset/ai4i2020.csv`) remains unapproved and unused by any running code.
+6. Frontend carries two module shells (Feature 02 `Layout` and quality `AppShell`) with separate navigation; cross-links added both ways (`/quality` ↔ `/`).
 
 ## Rules for updating this document
 
