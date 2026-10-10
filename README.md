@@ -45,7 +45,8 @@ A centralized web application for textile factories that connects raw material a
 | Machine / production / recommendation / analytics services & routers | Implemented and verified |
 | React application (Dashboard, Machines, Jobs, Recommendations, Analytics) | Implemented and verified |
 | Seed data (labeled fixtures), tests | 29 backend tests + 3 frontend tests passing |
-| Maahi inventory API, Ram order API, Auth/RBAC | Not implemented — a browser-local Ram buyer/admin workflow prototype is available; manual material checks are explicitly labelled demo data |
+| Maahi inventory API and Ram order API | Partial: buyer order data remains browser-local |
+| Authentication and feature authorization | Implemented for buyers, employees and administrators |
 | Module 03 Quality (Anand) frontend | Merged from branch `anand` — dashboard, inspections, modal form at `/quality` (in-memory demo data; API wiring pending) |
 
 The approved global theme and design tokens are version-controlled at [`frontend/src/styles/theme.css`](frontend/src/styles/theme.css) and [`frontend/src/styles/global.css`](frontend/src/styles/global.css); never invent a new brand palette.
@@ -65,7 +66,7 @@ Lakshita also owns the **platform foundation** required for Feature 02 (FastAPI 
 
 ### Ram order workflow prototype
 
-The frontend includes a buyer order request, order tracking, and Ram’s incoming-order review/decision flow, backed by browser local storage for demonstration only. Decisions and buyer-visible messages remain associated with the same Order ID. Material availability is not connected to Maahi: the review page displays an integration-pending state until Ram explicitly enters a clearly labelled demo check. The approved orders appear in the Lakshita production-planning integration boundary; no production API is called. This prototype is not production persistence or authentication.
+The frontend includes a buyer order request, order tracking, and Ram’s incoming-order review/decision flow, backed by browser local storage for demonstration only. Decisions and buyer-visible messages remain associated with the same Order ID. Material availability is not connected to Maahi: the review page displays an integration-pending state until Ram explicitly enters a clearly labelled demo check. The approved orders appear in the Lakshita production-planning integration boundary; no production API is called. Order data remains browser-local; account authentication is provided by the backend.
 
 ## Repository Structure
 
@@ -151,6 +152,14 @@ npm install
 npm run dev    # http://localhost:5173
 ```
 
+## Authentication and employee access
+
+Authentication uses backend-issued JWT sessions. Public registration creates buyer accounts only. Buyers sign in with email/password or Google; Google sign-in stays disabled until the OAuth Web Client ID is configured as `GOOGLE_CLIENT_ID` in `backend/.env` and `VITE_GOOGLE_CLIENT_ID` in `frontend/.env.local`.
+
+Administrators and employees use unique IDs (`ADM-000001`, `EMP-000002`) and passwords. Set `INITIAL_ADMIN_PASSWORD` to a unique password of at least 12 characters in `backend/.env` before running the seed command. The seed command prints the administrator login ID. For an existing database, the employee-permissions migration assigns IDs and forces existing staff/admin accounts to change their password at next sign-in.
+
+After updating the code, run `alembic upgrade head` from `backend/`. Sign in as the administrator and open **Employee Access** in `/admin` to create employees, assign per-feature access, disable accounts, or reset passwords. Temporary employee passwords are shown only once and require a password change at first sign-in. Staff navigation and backend API permissions both follow the assigned features. **Attendance** access enables employee check-in/check-out; administrators can view the attendance register.
+
 ## Testing
 
 ```bash
@@ -185,7 +194,7 @@ Only `.env.example` files are committed. Copy them to `.env` (backend) or `.env.
 
 - Keep secrets in environment variables; `.env` files are gitignored.
 - Inputs are validated on the backend (Pydantic).
-- Authentication, role-based access control, audit logs and backups are required before real deployment; they are not implemented yet (supervisor approval currently records the approver's name only).
+- Authentication and feature authorization are enforced by the backend. Google buyer sign-in requires OAuth client ID configuration. Audit logs and backups are not implemented; supervisor approval currently records the approver's name only.
 
 ## License
 

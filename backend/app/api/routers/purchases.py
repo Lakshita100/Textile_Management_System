@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.auth import require_permission
 from app.schemas import (
     PurchaseRequestCreate,
     PurchaseRequestListOut,
@@ -18,7 +19,7 @@ from app.schemas import (
 from app.services import purchases
 from app.services.common import transaction
 
-router = APIRouter(tags=["purchases"])
+router = APIRouter(tags=["purchases"], dependencies=[Depends(require_permission("materials"))])
 
 
 @router.get("/purchase-recommendations", response_model=RecommendationsOut, summary="Shortage + supplier comparison")

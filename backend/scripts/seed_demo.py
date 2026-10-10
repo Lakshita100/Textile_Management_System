@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+from app.config import settings
 from app.database import SessionLocal, engine, Base
 from app.models import (
     InspectionOutcome,
@@ -17,8 +18,9 @@ from app.models import (
     ProductionJob,
     ProductionJobStatus,
     QualityInspection,
+    User,
 )
-from app.services.auth import seed_user
+from app.services.auth import hash_password, seed_user
 from app.services.production import create_job, transition_job, update_progress
 
 
@@ -27,32 +29,36 @@ def _seed_accounts(db) -> None:
 
     Admin accounts can never be self-registered — they are provisioned here.
     """
-    accounts = [
-        dict(
-            email="admin@everestmills.com",
-            password="Admin@1234",
-            full_name="Factory Admin",
+    accounts = []
+    initial_admin_password = settings.INITIAL_ADMIN_PASSWORD.strip()
+    if initial_admin_password:
+        if len(initial_admin_password) < 12:
+            raise RuntimeError("INITIAL_ADMIN_PASSWORD must be at least 12 characters.")
+        accounts.insert(0, dict(
+            email=settings.INITIAL_ADMIN_EMAIL.strip().lower(),
+            password=initial_admin_password,
+            full_name=settings.INITIAL_ADMIN_NAME.strip(),
             role="admin",
             company="Everest Textile Mills",
-        ),
-        dict(
-            email="buyer@everestmills.com",
-            password="Demo@1234",
-            full_name="Aisha Rahman",
-            role="buyer",
-            company="Northwind Retail",
-        ),
-        dict(
-            email="staff@everestmills.com",
-            password="Staff@1234",
-            full_name="Priya Sharma",
-            role="staff",
-            company="Everest Textile Mills",
-        ),
-    ]
+        ))
     created = [seed_user(db, **account) for account in accounts]
     if any(created):
-        print("Seeded auth accounts: admin/buyer/staff (see docs or login pages).")
+        print("Seeded the configured administrator account.")
+    if initial_admin_password:
+        administrator_by_email = db.query(User).filter_by(
+            email=settings.INITIAL_ADMIN_EMAIL.strip().lower(),
+            role="admin",
+            must_change_password=True,
+        ).first()
+        if administrator_by_email:
+            administrator_by_email.password_hash = hash_password(initial_admin_password)
+            administrator_by_email.must_change_password = False
+            db.commit()
+    administrator = db.query(User).filter_by(role="admin", is_active=True).order_by(User.id).first()
+    if administrator:
+        print(f"Administrator login ID: {administrator.login_id}")
+    elif not initial_admin_password:
+        print("No administrator provisioned. Set INITIAL_ADMIN_PASSWORD in backend/.env, then rerun the seed script.")
 
 
 def _create_jobs(db) -> dict[str, ProductionJob]:

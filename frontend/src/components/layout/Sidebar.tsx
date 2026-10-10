@@ -1,6 +1,7 @@
 import { X } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { NAV_ITEMS } from './navigation';
+import { useAuth } from '../../store/AuthProvider';
 
 interface SidebarProps {
   open: boolean;
@@ -8,6 +9,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
+  const { hasPermission } = useAuth();
   return (
     <>
       {open ? (
@@ -51,7 +53,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             Modules
           </p>
           <ul className="space-y-1">
-            {NAV_ITEMS.map((item) => (
+            {NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission)).map((item) => (
               <li key={item.path}>
                 <NavLink
                   to={item.path}

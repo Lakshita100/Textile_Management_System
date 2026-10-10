@@ -10,11 +10,12 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.auth import require_permission
 from app.schemas import InventoryListOut, InventorySummaryOut, YarnCreate, YarnOut, YarnUpdate
 from app.services import inventory
 from app.services.common import transaction
 
-router = APIRouter(prefix="/inventory", tags=["inventory"])
+router = APIRouter(prefix="/inventory", tags=["inventory"], dependencies=[Depends(require_permission("materials"))])
 
 EXPORT_COLUMNS = [
     ("yarnId", "Yarn ID"),

@@ -36,6 +36,7 @@ This file records only what has been inspected in the repository with evidence. 
 | Shared documentation (`docs/`) | Created (Stage 0) | Architecture, plan, status, tracker, prerequisites, data sources, API contracts |
 | Approved theme / global CSS | Implemented and verified | `frontend/src/styles/theme.css` + `global.css`, imported by the running frontend; only approved tokens used |
 | Backend app shell (FastAPI `main.py`, CORS, `/api/v1`) | Implemented and verified | Health endpoints verified live; 500-handling verified |
+| Authentication and staff authorization | Implemented, unverified in this changeset | Buyer signup/login, Google token verification, provisioned employee/admin IDs, per-feature API and page guards, required password reset, attendance; apply migration `e5f6g7h8i9j0` |
 | Database models (Feature 02 + quality schema) | Implemented and verified | 7 tables via migrations `909cc08f3f36` + `b7f3d2c1a9e4` on PostgreSQL; SQLite for tests |
 | Alembic migrations | Implemented and verified | `alembic upgrade head` → `b7f3d2c1a9e4`; `alembic check` → no drift; sync-only engine (async path removed — `asyncpg` unavailable) |
 | Feature 02 — Machine Overview Dashboard | Implemented and verified | KPI cards, searchable/filterable table, detail + status history screens wired to live API |
@@ -53,9 +54,9 @@ This file records only what has been inspected in the repository with evidence. 
 | Module 03 Quality — backend | Implemented and verified | `quality_inspections` (migration `b7f3d2c1a9e4`) + `/api/v1/quality/*`: eligibility, qty caps, cross-checks, server-derived batch/roll/outcome, disposition updates, dashboard, roll preview, inspectable job, per-job counts; coded 409/404 errors |
 | Module 03 Quality — frontend (Anand) | Implemented and verified (API-backed) | Dashboard, All Inspections, modal form at `/quality` now read/write the persistent API (no in-memory demo data); Jobs ↔ Quality cross-links; employee session switcher remains demo-only |
 | Module 03 Packing / Dispatch (Anand) | Frontend implemented (merged from `anand`) | Inspection modal submit renamed "Proceed"; on success accepted metres queued to Packing (`queueFromInspection`); Packing page (`/quality/packing`, in-memory demo lots) + Dispatch page (`/quality/dispatch`, country/state/city analytics, demo shipments) with sidebar nav; build/lint verified 2026-10-10 — **in-memory demo data only; no warehouse/logistics backend** |
-| Module 04 Orders (Ram) | Frontend demo implemented and verified | Buyer request, same-ID incoming review, material-check boundary, reviewer decisions, buyer clarification/status updates; browser local storage only, no API/database/auth |
+| Module 04 Orders (Ram) | Frontend demo implemented; browser-local data | Buyer request, order review, and status messages remain local-storage only; authentication is backend-backed |
 | Modules 05/06 (Warehouse, Employees/Accounts) | Not implemented (owners TBD) | Partial demo UI only: Packing + Dispatch screens live under Module 03 (`/quality/packing`, `/quality/dispatch`, in-memory demo data); no warehouse stock or logistics backend |
-| Authentication / RBAC | Not implemented | Config placeholders removed pending design; supervisor approval currently records approver name only |
+
 | Backend tests | Implemented and verified | `python -m pytest -q` → **81 passed** (29 Feature 02 baseline + 32 ML/scheduling + 20 quality/concurrency) |
 | Frontend tests / build | Implemented and verified | `npm test` → **10 passed**; `npm run build` → success; `npm run lint` → oxlint 0 errors (2 pre-existing warnings) |
 | Live integration verification | Implemented and verified | uvicorn `:8000` + PostgreSQL: **37/37 checks** (e2e flow, coded error probes, dashboard from DB, parallel at-most-one-success, advisory-lock blocking proof, script-row-only cleanup) |
@@ -64,8 +65,8 @@ This file records only what has been inspected in the repository with evidence. 
 ## Known risks
 
 1. **Live integrations remain incomplete.** Module 01 inventory and Module 04 order APIs do not exist here; the buyer/admin order prototype is local-storage-only, and the manually entered Maahi demo check is not live stock. Contracts must be confirmed with Maahi and Ram before integration.
-2. **Auth/RBAC is not implemented.** Supervisor approval persists the approver name but there is no identity/role enforcement yet — required before real deployment.
-3. Analytics defect-rate and recommendation quality-score now read persisted `quality_inspections`; below 3 linked samples they show neutral-50 / `null` with explicit warnings (never fabricated). Anand's employee session switcher on the quality form is still demo-only (no auth).
+2. Buyer order persistence remains browser-local. Account authentication and staff feature authorization are backend-enforced. Google login requires OAuth Client ID configuration.
+3. Analytics defect-rate and recommendation quality-score now read persisted `quality_inspections`; below 3 linked samples they show neutral-50 / `null` with explicit warnings (never fabricated). Anand's employee session switcher on the quality form remains demo-only.
 4. Demo/seed rows (DEVELOPMENT FIXTURES) and earlier manual test rows live in the local PostgreSQL database; a fresh clone must run `alembic upgrade head` (and optionally the seed script).
 5. Optional ML (Stage 7 / `dataset/ai4i2020.csv`) remains unapproved and unused by any running code.
 7. **ML scheduling models are trained on SYNTHETIC data** (`dataset/textile_production_scheduling_dataset/`, seed 20261010); the ranking label is a heuristic, not ground truth. Do not claim real-factory accuracy. Model artifacts live in git-ignored `backend/mlartifacts/` — a fresh clone runs on rule fallback until `python scripts/train_duration_model.py` and `python scripts/train_allocation_ranker.py` are re-run. The scheduling dataset directory is currently **untracked**; commit it only on explicit approval.

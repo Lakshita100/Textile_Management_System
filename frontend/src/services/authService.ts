@@ -9,13 +9,32 @@ export type AuthRole = 'admin' | 'buyer' | 'staff';
 
 export interface AuthUser {
   id: number;
-  email: string;
+  email: string | null;
+  login_id: string | null;
   full_name: string;
   role: AuthRole;
   company: string | null;
   phone: string | null;
   is_active: boolean;
+  permissions: string[];
+  must_change_password: boolean;
   created_at: string;
+}
+
+export function homePathForUser(user: Pick<AuthUser, 'role' | 'permissions' | 'must_change_password'>): string {
+  if (user.must_change_password) return '/change-password';
+  if (user.role === 'admin') return '/admin';
+  if (user.role === 'buyer') return '/buyer';
+  const destinations: Record<string, string> = {
+    materials: '/inventory',
+    machines: '/machines',
+    production: '/dashboard',
+    recommendations: '/recommend',
+    quality: '/quality',
+    dispatch: '/quality/dispatch',
+    attendance: '/attendance',
+  };
+  return user.permissions.map((permission) => destinations[permission]).find(Boolean) ?? '/dashboard';
 }
 
 export interface AuthSession {
@@ -28,9 +47,25 @@ export interface RegisterInput {
   email: string;
   password: string;
   full_name: string;
-  role?: 'buyer' | 'staff';
   company?: string;
   phone?: string;
+}
+
+export interface EmployeeCreateInput {
+  full_name: string;
+  email?: string;
+  phone?: string;
+  permissions: string[];
+}
+
+export interface ProvisionedEmployee {
+  user: AuthUser;
+  temporary_password: string;
+}
+
+export interface EmployeeUpdateInput {
+  permissions?: string[];
+  is_active?: boolean;
 }
 
 const TOKEN_KEY = 'everest-auth-token';
@@ -65,8 +100,35 @@ export async function registerAccount(input: RegisterInput): Promise<AuthSession
   return http.post<AuthSession>('/auth/register', input);
 }
 
-export async function signIn(email: string, password: string): Promise<AuthSession> {
-  return http.post<AuthSession>('/auth/login', { email, password });
+export async function signIn(identifier: string, password: string): Promise<AuthSession> {
+  return http.post<AuthSession>('/auth/login', { identifier, password });
+}
+
+export async function signInWithGoogle(idToken: string): Promise<AuthSession> {
+  return http.post<AuthSession>('/auth/google', { id_token: idToken });
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<AuthUser> {
+  return http.post<AuthUser>('/auth/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  }, { headers: authHeaders() });
+}
+
+export async function listEmployeeAccounts(): Promise<AuthUser[]> {
+  return http.get<AuthUser[]>('/auth/admin/accounts', { headers: authHeaders() });
+}
+
+export async function createEmployee(input: EmployeeCreateInput): Promise<ProvisionedEmployee> {
+  return http.post<ProvisionedEmployee>('/auth/admin/employees', input, { headers: authHeaders() });
+}
+
+export async function updateEmployee(id: number, input: EmployeeUpdateInput): Promise<AuthUser> {
+  return http.patch<AuthUser>(`/auth/admin/accounts/${id}`, input, { headers: authHeaders() });
+}
+
+export async function resetEmployeePassword(id: number): Promise<ProvisionedEmployee> {
+  return http.post<ProvisionedEmployee>(`/auth/admin/accounts/${id}/reset-password`, undefined, { headers: authHeaders() });
 }
 
 export async function fetchCurrentUser(): Promise<AuthUser> {
