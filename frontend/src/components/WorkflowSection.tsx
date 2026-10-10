@@ -20,7 +20,7 @@ const STEP_ICONS = {
 
 export function WorkflowSection() {
   return (
-    <section id="solutions" className="scroll-mt-24 bg-canvas py-16 lg:py-20">
+    <section id="solutions" className="scroll-mt-24 bg-surface py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="reveal">
           <SectionHeading
@@ -46,7 +46,9 @@ export function WorkflowSection() {
                       className="absolute left-6 top-14 h-[calc(100%-2rem)] w-px bg-line lg:hidden xl:left-1/2 xl:top-7 xl:block xl:h-px xl:w-full"
                     />
                   ) : null}
-                  <div                   className="relative z-10 flex size-12 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-primary shadow-card lg:mx-auto">
+                  <div
+                    className="relative z-10 flex size-12 shrink-0 items-center justify-center rounded-full border border-line bg-white text-primary shadow-card lg:mx-auto"
+                  >
                     <Icon aria-hidden className="size-5" />
                   </div>
                   <div className="min-w-0 lg:mt-4 lg:px-2 lg:text-center">

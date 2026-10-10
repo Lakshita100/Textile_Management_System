@@ -63,18 +63,24 @@ export default function SummaryCards({ summary }: SummaryCardsProps) {
         {cards.map((card) => {
           const { Icon, className } = CARD_ICONS[card.id];
           return (
-            <li key={card.id} className="card p-5">
+            <li
+              key={card.id}
+              className="rounded-[18px] border border-slate-200 bg-white p-5 shadow-[0_2px_10px_rgba(15,23,42,0.02)]"
+            >
               <div className="flex items-start justify-between gap-3">
-                <p className="text-sm font-medium text-[var(--color-text-muted)]">{card.label}</p>
+                <p className="text-[1.15rem] font-medium text-slate-600">{card.label}</p>
                 <span
                   aria-hidden
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-button)] bg-[var(--color-surface)]"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-slate-50"
                 >
                   <Icon size={18} className={className} />
                 </span>
               </div>
-              <p className="mt-3 text-3xl font-semibold tabular-nums text-[var(--color-heading)]">{card.value}</p>
-              <p className="mt-1 text-xs text-[var(--color-text-muted)]">{card.hint}</p>
+
+              <p className="mt-4 text-[2.1rem] font-semibold leading-none tracking-[-0.05em] text-slate-800 tabular-nums">
+                {card.value}
+              </p>
+              <p className="mt-3 text-sm text-slate-500">{card.hint}</p>
             </li>
           );
         })}

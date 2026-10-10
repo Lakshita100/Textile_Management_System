@@ -1,4 +1,5 @@
 @import "./theme.css";
+@import "./admin-theme.css";
 
 /* Global styles: import once from the frontend entry point.
    Team base rules live in @layer base and component rules in

@@ -24,13 +24,6 @@ const INDICATOR_ICONS = {
   activity: Activity,
 } as const;
 
-const ACCENT_CLASSES = {
-  package: 'bg-primary/10 text-primary',
-  clipboard: 'bg-primary/10 text-primary',
-  cog: 'bg-primary/10 text-primary',
-  waves: 'bg-primary/10 text-primary',
-} as const;
-
 const TONE_CLASSES: Record<StatTone, string> = {
   success: 'text-success',
   error: 'text-error',
@@ -42,32 +35,31 @@ export function StatisticsStrip() {
   return (
     <section
       aria-label="Sample operational statistics"
-      className="border-b border-line bg-surface"
+      className="bg-white border-y border-line"
     >
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-12">
-        <ul className="grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="grid gap-0 overflow-hidden lg:grid-cols-4">
           {DEMO_STATS.map((stat) => {
             const Icon = STAT_ICONS[stat.icon];
             const IndicatorIcon = INDICATOR_ICONS[stat.indicator.icon];
             return (
               <li
                 key={stat.id}
-                className="flex items-start gap-4 bg-surface p-6"
+                className="flex items-start gap-4 bg-white p-6 border-r border-line/50 lg:border-r last:border-r-0"
               >
                 <span
                   aria-hidden
                   className={cx(
-                    'flex size-12 shrink-0 items-center justify-center rounded-lg',
-                    ACCENT_CLASSES[stat.icon],
+                    'flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary',
                   )}
                 >
-                  <Icon className="size-6" />
+                  <Icon className="size-5.5" />
                 </span>
                 <div className="min-w-0">
                   <p className="font-display text-2xl font-bold tracking-tight text-ink">
                     {stat.value}
                   </p>
-                  <p className="mt-0.5 text-sm text-muted">{stat.label}</p>
+                  <p className="mt-1 text-sm text-muted">{stat.label}</p>
                   <p
                     className={cx(
                       'mt-2 inline-flex items-center gap-1.5 text-xs font-medium',

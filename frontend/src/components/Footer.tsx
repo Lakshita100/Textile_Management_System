@@ -25,11 +25,11 @@ const RESOURCE_ITEMS = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-line bg-surface">
+    <footer className="border-t border-line bg-white">
       <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.5fr_1fr_1fr_1fr_1fr]">
           <div className="max-w-sm">
-            <Logo />
+            <Logo variant="dark" showTagline={true} />
             <p className="mt-4 text-sm leading-relaxed text-muted">
               A connected platform for textile manufacturing, inventory,
               production, quality, and dispatch management.
@@ -37,10 +37,7 @@ export function Footer() {
           </div>
 
           <nav aria-labelledby="footer-platform">
-            <h2
-              id="footer-platform"
-              className="text-sm font-semibold text-ink"
-            >
+            <h2 id="footer-platform" className="text-sm font-semibold text-ink">
               Platform
             </h2>
             <ul className="mt-4 space-y-2.5">
@@ -98,7 +95,7 @@ export function Footer() {
               <li>
                 <Link
                   to="/login"
-                  className="text-sm text-primary transition-colors hover:text-primary-dark"
+                  className="text-sm text-primary transition-colors hover:text-primary-hover"
                 >
                   Sign in to the platform
                 </Link>
@@ -106,7 +103,7 @@ export function Footer() {
               <li>
                 <a
                   href="#home"
-                  className="text-sm text-primary transition-colors hover:text-primary-dark"
+                  className="text-sm text-primary transition-colors hover:text-primary-hover"
                 >
                   Back to top
                 </a>

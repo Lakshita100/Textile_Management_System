@@ -14,33 +14,34 @@
   --font-display: Manrope, Inter, ui-sans-serif, system-ui, sans-serif;
 
   /* Shared brand (aligned with styles/theme.css) */
-  --color-primary: #3f85c4;
-  --color-accent: #76b82a;
-  --color-surface: #ffffff;
+  --color-primary: #0868B9;
+  --color-primary-hover: #075aa3;
+  --color-primary-dark: #103957;
+  --color-accent: #70B52B;
+  --color-surface: #FFFFFF;
   --color-success: #16a34a;
 
-  /* Landing-only palette */
-  --color-primary-dark: #073b63;
-  --color-canvas: #f4f7fa;
-  --color-ink: #172b45;
-  --color-muted: #52657c;
-  --color-line: #e1e8f0;
-  --color-warning: #f59e0b;
-  --color-error: #dc2626;
+  /* Landing palette using theme.css tokens */
+  --color-canvas: #FFFFFF;
+  --color-ink: #17344C;
+  --color-muted: #64758A;
+  --color-line: #E2E8EF;
+  --color-warning: #D97706;
+  --color-error: #DC2626;
   /* Elevation */
-  --shadow-card: 0 1px 2px rgb(23 43 69 / 6%);
-  --shadow-elevated: 0 12px 32px rgb(7 59 99 / 12%);
+  --shadow-card: 0 2px 8px rgba(16, 57, 87, 0.04);
+  --shadow-elevated: 0 12px 32px rgba(16, 57, 87, 0.12);
 }
 
 /* Keep the marketing palette consistent without changing signed-in screens. */
 .landing-page {
-  --color-primary: #428bc5;
-  --color-primary-dark: #0b2f4a;
-  --color-accent: #73bc27;
-  --color-canvas: #f3f7fa;
-  --color-ink: #17344c;
-  --color-muted: #526c83;
-  --color-line: #dce6ef;
+  --color-primary: #0868B9;
+  --color-primary-dark: #103957;
+  --color-accent: #70B52B;
+  --color-canvas: #FFFFFF;
+  --color-ink: #17344C;
+  --color-muted: #64758A;
+  --color-line: #E2E8EF;
 }
 
 @layer base {

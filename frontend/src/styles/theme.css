@@ -1,21 +1,25 @@
 :root {
   /* Brand colors — approved palette. */
-  --color-primary: #3F85C4;
-  --color-primary-hover: #3274B0;
-  --color-accent: #76B82A;
+  --color-primary: #0868B9;
+  --color-primary-hover: #075aa3;
+  --color-primary-dark: #103957;
+  --color-accent: #70B52B;
 
   /* Backgrounds */
   --color-background: #FFFFFF;
-  --color-surface: #F0F0F0;
-  --color-surface-hover: #F7FAFC;
+  --color-surface: #F7F9FB;
+  --color-surface-hover: #F0F4F8;
+  --color-canvas: #FFFFFF;
 
   /* Typography */
-  --color-heading: #2F2F2F;
-  --color-text: #333333;
-  --color-text-muted: #6B7280;
+  --color-heading: #17344C;
+  --color-text: #17344C;
+  --color-text-muted: #64758A;
+  --color-ink: #17344C;
 
   /* Borders */
-  --color-border: #E5E5E5;
+  --color-border: #E2E8EF;
+  --color-line: #E2E8EF;
 
   /* Inventory status semantics */
   --color-success: #16A34A;
@@ -24,18 +28,20 @@
   --color-warning-bg: #FEF3C7;
   --color-danger: #DC2626;
   --color-danger-bg: #FEE2E2;
+  --color-error: #DC2626;
 
   /* Components */
   --color-sidebar: #FFFFFF;
   --color-table-header: #F5F7FA;
   --color-input-background: #FFFFFF;
-  --color-focus-ring: #3F85C4;
+  --color-focus-ring: #0868B9;
 
   /* UI styling */
   --radius-card: 12px;
   --radius-button: 8px;
   --radius-input: 8px;
-  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 2px 8px rgba(16, 57, 87, 0.04);
+  --shadow-elevated: 0 12px 32px rgba(16, 57, 87, 0.12);
 
   /* Semantic aliases */
   --color-link: var(--color-primary);

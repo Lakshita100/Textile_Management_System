@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CircleAlert, Loader2 } from 'lucide-react';
-import { Logo } from '../components/Logo';
+import { CircleAlert, Loader2 } from 'lucide-react';
 import { buttonClass } from '../components/ui/Button';
 import GoogleSignInButton from '../components/auth/GoogleSignInButton';
+import AuthPageShell from '../components/auth/AuthPageShell';
 import { useAuth } from '../store/AuthProvider';
 import { homePathForUser } from '../services/authService';
 import { errorMessage } from '../services/http';
@@ -64,25 +64,11 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link to="/" aria-label="Everest Textile Mills — home">
-            <Logo />
-          </Link>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-primary"
-          >
-            <ArrowLeft aria-hidden className="size-4" />
-            Back to home
-          </Link>
-        </div>
-      </header>
-
-      <main className="flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
-        <div className="w-full max-w-md">
-          <div className="rounded-2xl border border-line bg-surface p-8 shadow-card">
+    <AuthPageShell
+      eyebrow="FACTORY WORKSPACE"
+      heading="Welcome back to Everest."
+      description="Sign in to manage textile operations, production and order progress from one connected workspace."
+    >
             <h1 className="font-display text-2xl font-extrabold text-ink">
               Sign in
             </h1>
@@ -187,8 +173,6 @@ export default function SignInPage() {
                 Buyer portal
               </Link>
             </div>
-          </div>
-
           <p className="mt-6 text-center text-xs text-muted">
             No account yet?{' '}
             <Link to="/signup" className="font-semibold text-primary">
@@ -197,8 +181,6 @@ export default function SignInPage() {
             — buyer accounts can self-register; employee and administrator IDs are
             assigned by the factory administrator.
           </p>
-        </div>
-      </main>
-    </div>
+    </AuthPageShell>
   );
 }
