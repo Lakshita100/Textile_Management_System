@@ -51,8 +51,9 @@ This file records only what has been inspected in the repository with evidence. 
 | Module 01 Raw Materials (Maahi) | Not implemented | Material gate served by labeled FIXTURE adapter |
 | Module 03 Quality — backend | Implemented and verified | `quality_inspections` (migration `b7f3d2c1a9e4`) + `/api/v1/quality/*`: eligibility, qty caps, cross-checks, server-derived batch/roll/outcome, disposition updates, dashboard, roll preview, inspectable job, per-job counts; coded 409/404 errors |
 | Module 03 Quality — frontend (Anand) | Implemented and verified (API-backed) | Dashboard, All Inspections, modal form at `/quality` now read/write the persistent API (no in-memory demo data); Jobs ↔ Quality cross-links; employee session switcher remains demo-only |
+| Module 03 Packing / Dispatch (Anand) | Frontend implemented (merged from `anand`) | Inspection modal submit renamed "Proceed"; on success accepted metres queued to Packing (`queueFromInspection`); Packing page (`/quality/packing`, in-memory demo lots) + Dispatch page (`/quality/dispatch`, country/state/city analytics, demo shipments) with sidebar nav; build/lint verified 2026-10-10 — **in-memory demo data only; no warehouse/logistics backend** |
 | Module 04 Orders (Ram) | Not implemented | Order refs served by labeled FIXTURE adapter |
-| Modules 05/06 (Warehouse, Employees/Accounts) | Not implemented | Owners TBD |
+| Modules 05/06 (Warehouse, Employees/Accounts) | Not implemented (owners TBD) | Partial demo UI only: Packing + Dispatch screens live under Module 03 (`/quality/packing`, `/quality/dispatch`, in-memory demo data); no warehouse stock or logistics backend |
 | Authentication / RBAC | Not implemented | Config placeholders removed pending design; supervisor approval currently records approver name only |
 | Backend tests | Implemented and verified | `python -m pytest -q` → **81 passed** (29 Feature 02 baseline + 32 ML/scheduling + 20 quality/concurrency) |
 | Frontend tests / build | Implemented and verified | `npm test` → **10 passed**; `npm run build` → success; `npm run lint` → oxlint 0 errors (2 pre-existing warnings) |

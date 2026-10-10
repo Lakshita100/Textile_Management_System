@@ -15,6 +15,8 @@ import { SessionProvider } from './store/SessionProvider';
 import { InspectionFormProvider } from './store/InspectionFormProvider';
 import QualityDashboardPage from './pages/quality/QualityDashboardPage';
 import AllInspectionsPage from './pages/quality/AllInspectionsPage';
+import PackingPage from './pages/packing/PackingPage';
+import DispatchPage from './pages/dispatch/DispatchPage';
 
 export default function App() {
   return (
@@ -48,6 +50,8 @@ export default function App() {
         >
           <Route index element={<QualityDashboardPage />} />
           <Route path="inspections" element={<AllInspectionsPage />} />
+          <Route path="packing" element={<PackingPage />} />
+          <Route path="dispatch" element={<DispatchPage />} />
         </Route>
 
         <Route path="*" element={<NotFoundPage />} />

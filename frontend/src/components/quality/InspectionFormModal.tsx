@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../store/session'
 import { useInspectionForm } from '../../store/inspectionFormContext'
+import { useAsync } from '../../hooks/useAsync'
+import { queueFromInspection } from '../../services/packingService'
 import {
   createInspection,
   DEFECT_TYPES,
@@ -9,7 +12,7 @@ import {
   getMachines,
   previewRollId,
 } from '../../services/qualityService'
-import type { ActiveJob, DefectSeverity, MachineRef } from '../../types/quality'
+import type { ActiveJob, DefectSeverity } from '../../types/quality'
 
 interface FormDefect {
   type: string
@@ -41,8 +44,9 @@ const inputClass = (hasError: boolean) =>
 export default function InspectionFormModal() {
   const { closeForm } = useInspectionForm()
   const { employee } = useSession()
-  const [machines, setMachines] = useState<MachineRef[]>([])
-  const [machinesError, setMachinesError] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const machineOptions = useAsync(getMachines, [])
+  const machines = machineOptions.data ?? []
   const machineRef = useRef<HTMLSelectElement>(null)
 
   const [machineId, setMachineId] = useState('')
@@ -52,7 +56,7 @@ export default function InspectionFormModal() {
   const [remarks, setRemarks] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [jobResult, setJobResult] = useState<{ machineId: string; outcome: JobOutcome } | null>(null)
-  const [rollPreview, setRollPreview] = useState<{ jobId: number; rollId: string } | null>(null)
+  const [rollPreview, setRollPreview] = useState<{ key: string; rollId: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [created, setCreated] = useState<{
@@ -60,22 +64,6 @@ export default function InspectionFormModal() {
     rollId: string
     toWarehouse: number
   } | null>(null)
-
-  useEffect(() => {
-    let cancelled = false
-    getMachines()
-      .then((m) => {
-        if (!cancelled) setMachines(m)
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) {
-          setMachinesError(err instanceof Error ? err.message : 'Could not load machines.')
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
 
   useEffect(() => {
     machineRef.current?.focus()
@@ -103,7 +91,7 @@ export default function InspectionFormModal() {
         if (job) {
           previewRollId(job.jobId)
             .then((rollId) => {
-              if (!cancelled) setRollPreview({ jobId: job.jobId, rollId })
+              if (!cancelled) setRollPreview({ key: `${job.machineId}|${job.batchNo}`, rollId })
             })
             .catch(() => {
               if (!cancelled) setRollPreview(null)
@@ -136,6 +124,9 @@ export default function InspectionFormModal() {
       : { status: 'loading' }
 
   const activeJob = jobState.status === 'ready' ? jobState.job : null
+
+  const rollIdFor = (job: ActiveJob): string =>
+    rollPreview?.key === `${job.machineId}|${job.batchNo}` ? rollPreview.rollId : 'Generating...'
 
   const setDefect = (index: number, patch: Partial<FormDefect>) => {
     setDefects((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)))
@@ -184,6 +175,14 @@ export default function InspectionFormModal() {
           severity: d.severity,
         })),
         remarks: remarks.trim() || undefined,
+      })
+      queueFromInspection({
+        rollId: result.rollId,
+        batchNo: result.batchNo,
+        orderId: result.orderId,
+        machineId: result.machineId,
+        qtyMeters: result.acceptedQtyMeters,
+        packedBy: employee.name,
       })
       setCreated({ id: result.id, rollId: result.rollId, toWarehouse: result.acceptedQtyMeters })
       setDefects([{ type: '', count: '1', severity: 'Medium' }])
@@ -247,11 +246,19 @@ export default function InspectionFormModal() {
               aria-live="polite"
             >
               <p className="text-sm font-semibold text-title">
-                Inspection #{created.id} saved - roll {created.rollId} - {created.toWarehouse} m to warehouse
+                Inspection #{created.id} saved - roll {created.rollId} - {created.toWarehouse} m
+                queued for packing
               </p>
               <div className="mt-2 flex gap-4 text-sm">
-                <button type="button" className="btn-primary px-3 py-1.5" onClick={closeForm}>
-                  Done
+                <button
+                  type="button"
+                  className="btn-primary px-3 py-1.5"
+                  onClick={() => {
+                    closeForm()
+                    navigate('/quality/packing')
+                  }}
+                >
+                  View packing
                 </button>
                 <button
                   type="button"
@@ -291,22 +298,25 @@ export default function InspectionFormModal() {
                 }}
                 aria-invalid={Boolean(errors.machineId)}
               >
-                <option value="">Select a machine...</option>
+                <option value="">
+                  {machineOptions.loading ? 'Loading machines...' : 'Select a machine...'}
+                </option>
                 {machines.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name} ({m.id}) - {m.process}
                   </option>
                 ))}
               </select>
+              {machineOptions.error ? (
+                <p role="alert" className="text-sm font-medium text-title">
+                  <span aria-hidden="true">! </span>
+                  Could not load machines: {machineOptions.error}
+                </p>
+              ) : null}
               {errors.machineId ? (
                 <p role="alert" className="text-sm font-medium text-title">
                   <span aria-hidden="true">! </span>
                   {errors.machineId}
-                </p>
-              ) : machinesError ? (
-                <p role="alert" className="text-sm font-medium text-title">
-                  <span aria-hidden="true">! </span>
-                  {machinesError}
                 </p>
               ) : null}
             </div>
@@ -330,12 +340,7 @@ export default function InspectionFormModal() {
                   {row('Status', STATUS_LABEL[jobState.job.status] ?? jobState.job.status)}
                   {row('Batch no', jobState.job.batchNo)}
                   {row('Order', jobState.job.orderId)}
-                  {row(
-                    'Roll ID',
-                    rollPreview && rollPreview.jobId === jobState.job.jobId
-                      ? rollPreview.rollId
-                      : '...',
-                  )}
+                  {row('Roll ID', rollIdFor(jobState.job))}
                   {row('Output', `${jobState.job.producedQtyMeters} of ${jobState.job.plannedQtyMeters} m`)}
                   {row('Inspected', `${jobState.job.producedQtyMeters} m`)}
                   {row('Date', today())}
@@ -491,7 +496,7 @@ export default function InspectionFormModal() {
                   Cancel
                 </button>
                 <button type="submit" className="btn-primary" disabled={submitting || !activeJob}>
-                  {submitting ? 'Saving...' : 'Save inspection'}
+                  {submitting ? 'Proceeding...' : 'Proceed'}
                 </button>
               </div>
             </fieldset>
