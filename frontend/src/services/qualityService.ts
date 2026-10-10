@@ -1,4 +1,5 @@
 import { qualityApi, machinesApi, apiErrorMessage } from './api'
+import type { MachineListItem } from '../types'
 import type {
   ActiveJob,
   CreateInspectionInput,
@@ -25,33 +26,29 @@ export const DEFECT_TYPES = [
   'Weft bar',
 ] as const
 
-/** Flagging rule mirrored from the backend (documented, not a validated factory parameter). */
-export const FLAG_RULE = {
-  defectRatePer100m: 0.5,
-  passRatePct: 80,
-}
-
 function toInspection(w: InspectionWire): QualityInspection {
   return {
     id: w.id,
     jobId: w.job_id,
     rollId: w.roll_id,
-    batchNo: w.batch_no,
     orderId: w.order_ref,
     machineId: w.machine_code,
     machineIdNum: w.machine_id,
     machineName: w.machine_name,
     jobStatus: w.job_status,
-    inspectedAt: w.inspected_at,
+    batchNo: w.batch_no,
     employeeId: w.employee_id,
     inspectorName: w.inspector_name,
+    inspectedAt: w.inspected_at,
     inspectedQtyMeters: w.inspected_qty_meters,
     acceptedQtyMeters: w.accepted_qty_meters,
-    defects: w.defects ?? [],
+    defects: w.defects,
     totalDefectCount: w.total_defect_count,
     outcome: w.outcome,
     remarks: w.remarks,
     source: w.source,
+    createdAt: w.created_at,
+    updatedAt: w.updated_at,
   }
 }
 
@@ -59,7 +56,7 @@ function toInspection(w: InspectionWire): QualityInspection {
 export async function getMachines(): Promise<MachineRef[]> {
   try {
     const page = await machinesApi.list({ page_size: 100 })
-    return page.items.map((m) => ({
+    return page.items.map((m: MachineListItem) => ({
       machineId: m.id,
       id: m.code,
       name: m.name,
@@ -160,13 +157,27 @@ export async function getDashboardBundle(): Promise<DashboardBundle> {
         rejectedCount: w.stats.rejected_count,
         machinesFlagged: w.stats.machines_flagged,
       },
-      trend: w.trend.map((t) => ({
+      trend: w.trend.map((t: { date: string; defect_rate_per_100m: number; inspections: number }) => ({
         date: t.date,
         defectRatePer100m: t.defect_rate_per_100m,
         inspections: t.inspections,
       })),
-      byType: w.by_type.map((b) => ({ type: b.type, count: b.count })),
-      summaries: w.summaries.map((s) => ({
+      byType: w.by_type.map((b: { type: string; count: number }) => ({ type: b.type, count: b.count })),
+      summaries: w.summaries.map((s: {
+        machine: { machine_id: number; id: string; name: string; process: string; output_meters: number; downtime_hours: number };
+        inspections: number;
+        approved: number;
+        rework: number;
+        rejected: number;
+        inspected_qty_meters: number;
+        accepted_qty_meters: number;
+        total_defects: number;
+        defect_rate_per_100m: number;
+        pass_rate_percent: number;
+        efficiency_percent: number;
+        needs_investigation: boolean;
+        flag_reason: string;
+      }) => ({
         machine: {
           machineId: s.machine.machine_id,
           id: s.machine.id,
@@ -188,7 +199,7 @@ export async function getDashboardBundle(): Promise<DashboardBundle> {
         needsInvestigation: s.needs_investigation,
         flagReason: s.flag_reason,
       })),
-      matrix: w.matrix.map((m) => ({
+      matrix: w.matrix.map((m: { machine_id: string; machine_name: string; counts: Record<string, number>; total: number }) => ({
         machineId: m.machine_id,
         machineName: m.machine_name,
         counts: m.counts,
@@ -200,15 +211,15 @@ export async function getDashboardBundle(): Promise<DashboardBundle> {
   }
 }
 
-/** Per-job inspection counts for the production board cross-link. */
-export async function getInspectionCounts(): Promise<Record<number, InspectionCount>> {
+/** Return inspectable jobs with an inspection count, to highlight active jobs on cards. */
+export async function getInspectionCounts(): Promise<InspectionCount[]> {
   try {
-    const rows = await qualityApi.inspectionCounts()
-    const map: Record<number, InspectionCount> = {}
-    for (const r of rows) {
-      map[r.job_id] = { jobId: r.job_id, count: r.count, latestInspectionId: r.latest_inspection_id }
-    }
-    return map
+    const list = await qualityApi.inspectionCounts()
+    return list.map((item: { job_id: number; count: number; latest_inspection_id: number | null }) => ({
+      jobId: item.job_id,
+      count: item.count,
+      latestInspectionId: item.latest_inspection_id,
+    }))
   } catch (err) {
     throw new Error(apiErrorMessage(err))
   }

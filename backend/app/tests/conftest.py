@@ -1,67 +1,125 @@
-"""Test fixtures: SQLite in-memory database with dependency override.
+"""Test fixtures: isolated SQLite database created via Alembic migrations.
 
-Migrations still target PostgreSQL; API tests use SQLite for speed/isolation.
+The test database URL is injected BEFORE any application import so that
+`app.config.Settings` and the engine pick it up.
 """
 
 from __future__ import annotations
 
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+import os
+import tempfile
+from pathlib import Path
 
-from app.database import Base, get_db
-from app.main import app
-from app.models import *  # noqa: F401,F403 — register tables
+_TEST_DIR = Path(tempfile.mkdtemp(prefix="textile_test_"))
+os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DIR / 'test.db'}"
+os.environ["ECHO_SQL"] = "False"
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import delete  # noqa: E402
+
+import app.models  # noqa: E402
+from app.database import Base, SessionLocal, engine  # noqa: E402
+from app.main import app  # noqa: E402
+from app.models import (  # noqa: E402
+    Machine,
+    MachineDowntime,
+    MachineRecommendation,
+    MachineStatusEvent,
+    ProductionJob,
+    ProductionJobStatusEvent,
+    PurchaseRequest,
+    QualityInspection,
+    Sequence,
+    StockAlert,
+    StockMovement,
+    Supplier,
+    SupplierCategory,
+    SupplierChangeHistory,
+    SupplierProductCode,
+    YarnInventory,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+BACKEND_ROOT = REPO_ROOT / "backend"
+
+
+def _upgrade_schema() -> None:
+    Base.metadata.create_all(bind=engine)
+
+
+_upgrade_schema()
 
 
 @pytest.fixture()
-def db_session():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = TestingSession()
+def db():
+    session = SessionLocal()
     try:
         yield session
     finally:
         session.close()
-        engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def clean_tables(db):
+    """Every test starts from an empty database."""
+    for model in (
+        QualityInspection,
+        MachineRecommendation,
+        MachineDowntime,
+        ProductionJobStatusEvent,
+        ProductionJob,
+        MachineStatusEvent,
+        Machine,
+        PurchaseRequest,
+        StockAlert,
+        StockMovement,
+        SupplierChangeHistory,
+        SupplierCategory,
+        SupplierProductCode,
+        Supplier,
+        YarnInventory,
+        Sequence,
+    ):
+        db.execute(delete(model))
+    db.commit()
+    yield
 
 
 @pytest.fixture()
-def client(db_session):
-    def override():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
+def client():
+    with TestClient(app) as test_client:
+        yield test_client
 
 
 @pytest.fixture()
-def machine_factory(db_session):
-    from app.models.machine import Machine, MachineStatus
+def db_session(db):
+    return db
 
-    def _make(code="M1", processes="WEAVING", materials="COTTON", capacity=500.0, status=MachineStatus.IDLE):
+
+@pytest.fixture()
+def machine_factory(db):
+    _counter = [0]
+
+    def _create(**kwargs):
+        _counter[0] += 1
+        num = _counter[0]
+        capacity = kwargs.pop("capacity", 500.0)
+        status = kwargs.pop("status", Machine.status.type.enums[0] if hasattr(Machine.status, "type") else "IDLE")
         m = Machine(
-            code=code,
-            name=f"Machine {code}",
-            machine_type="LOOM",
-            supported_processes=processes,
-            compatible_materials=materials,
+            code=kwargs.pop("code", f"MCH-{num:04d}"),
+            name=kwargs.pop("name", f"Machine {num}"),
+            machine_type=kwargs.pop("machine_type", "Weaving Machine"),
+            supported_processes=kwargs.pop("supported_processes", "WEAVING,DYEING"),
             capacity_value=capacity,
-            capacity_unit="meters/day",
+            capacity_unit=kwargs.pop("capacity_unit", "meters/hr"),
             status=status,
+            **kwargs,
         )
-        db_session.add(m)
-        db_session.commit()
-        db_session.refresh(m)
+        db.add(m)
+        db.commit()
+        db.refresh(m)
         return m
 
-    return _make
+    return _create
+

@@ -21,7 +21,7 @@ export default function MachinesPage() {
     machinesApi
       .list({ search: search || undefined, status: status || undefined, process: process || undefined, page_size: 50 })
       .then(setData)
-      .catch((e) => setError(apiErrorMessage(e)))
+      .catch((e: unknown) => setError(apiErrorMessage(e)))
       .finally(() => setLoading(false));
   }, [search, status, process]);
 

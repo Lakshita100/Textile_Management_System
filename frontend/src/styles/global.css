@@ -1,139 +1,169 @@
+@import "tailwindcss";
 @import "./theme.css";
 
-/* Global styles: import once from the frontend entry point. */
-* {
-  box-sizing: border-box;
+/* Global styles: import once from the frontend entry point.
+   Team base rules live in @layer base and component rules in
+   @layer components so Tailwind utilities can override them. */
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    color-scheme: light;
+    background: var(--color-background);
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-background);
+    color: var(--color-text);
+    font-family: var(--font-family-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  a {
+    color: var(--color-link);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--color-heading);
+    line-height: 1.25;
+    margin: 0;
+  }
+
+  hr,
+  table,
+  input,
+  select,
+  textarea {
+    border-color: var(--color-border);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
 }
 
-html {
-  color-scheme: light;
-  background: var(--color-background);
-}
+@layer components {
+  .page {
+    min-height: 100vh;
+    background: var(--color-background);
+    color: var(--color-text);
+  }
 
-body {
-  margin: 0;
-  background: var(--color-background);
-  color: var(--color-text);
-  font-family: var(--font-family-base);
-  line-height: 1.5;
-}
+  .surface {
+    background: var(--color-surface);
+  }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
+  .card {
+    background: var(--color-background);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
 
-button {
-  cursor: pointer;
-}
+  .btn-primary,
+  .btn-accent,
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    border-radius: var(--radius-button);
+    padding: 0.6rem 1rem;
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    transition:
+      background-color 150ms ease,
+      border-color 150ms ease;
+  }
 
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
+  .btn-primary {
+    background: var(--color-primary);
+    color: var(--color-background);
+    border: 1px solid var(--color-primary);
+  }
 
-a {
-  color: var(--color-link);
-}
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+  }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  color: var(--color-heading);
-  line-height: 1.25;
-}
+  .btn-accent {
+    background: var(--color-accent);
+    color: var(--color-heading);
+    border: 1px solid var(--color-accent);
+  }
 
-hr,
-.border,
-table,
-input,
-select,
-textarea {
-  border-color: var(--color-border);
-}
+  .btn-secondary {
+    background: var(--color-background);
+    color: var(--color-heading);
+    border: 1px solid var(--color-border);
+  }
 
-:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+  }
 
-.page {
-  min-height: 100vh;
-  background: var(--color-background);
-  color: var(--color-text);
-}
+  .table-header {
+    background: var(--color-table-header);
+    color: var(--color-heading);
+  }
 
-.surface {
-  background: var(--color-surface);
-}
+  .muted {
+    color: var(--color-text-muted);
+  }
 
-.card {
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
-}
+  .scrim {
+    background: color-mix(in srgb, var(--color-heading) 45%, transparent);
+  }
 
-.btn-primary {
-  background: var(--color-primary);
-  color: var(--color-background);
-  border: 1px solid var(--color-primary);
-  border-radius: var(--radius-sm);
-  padding: 0.6rem 1rem;
-}
+  .input-base {
+    width: 100%;
+    height: 2.75rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--color-border);
+    background: var(--color-background);
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-text);
+  }
 
-.btn-accent {
-  background: var(--color-accent);
-  color: var(--color-heading);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-sm);
-  padding: 0.6rem 1rem;
-}
+  .input-base:focus {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 1px;
+    border-color: var(--color-primary);
+  }
 
-.btn-secondary {
-  background: var(--color-background);
-  color: var(--color-heading);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 0.6rem 1rem;
+  textarea.input-base {
+    height: auto;
+    padding: 0.6rem 0.75rem;
+  }
 }
-
-.table-header {
-  background: var(--color-surface);
-  color: var(--color-heading);
-}
-
-.muted {
-  color: var(--color-text);
-  opacity: 0.78;
-}
-
-.input-base {
-  width: 100%;
-  height: 2.75rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--color-border);
-  background: var(--color-background);
-  padding: 0 0.75rem;
-  font-size: 0.875rem;
-  color: var(--color-text);
-}
-
-.input-base:focus {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-  border-color: var(--color-primary);
-}
-
-textarea.input-base {
-  height: auto;
-  padding: 0.6rem 0.75rem;
-}
-
-/* Do not add arbitrary hex colors or gradients in component styles.
-   Prefer the approved variables above. */

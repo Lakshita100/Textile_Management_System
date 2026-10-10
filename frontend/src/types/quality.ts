@@ -32,6 +32,8 @@ export interface QualityInspection {
   remarks?: string | null
   /** Where the record came from. Persisted records are always live session entries. */
   source: 'demo-seed' | 'session-entry'
+  createdAt?: string
+  updatedAt?: string
 }
 
 /** Production job available for inspection on a machine (from the API). Null = nothing to inspect. */
