@@ -4,8 +4,9 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CircleAlert, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { buttonClass } from '../components/ui/Button';
+import GoogleSignInButton from '../components/auth/GoogleSignInButton';
 import { useAuth } from '../store/AuthProvider';
-import type { AuthRole } from '../services/authService';
+import { homePathForUser } from '../services/authService';
 import { errorMessage } from '../services/http';
 
 interface FormErrors {
@@ -17,22 +18,18 @@ interface FormErrors {
   phone?: string;
 }
 
-const homeForRole = (role: AuthRole): string =>
-  role === 'admin' ? '/admin' : role === 'buyer' ? '/buyer' : '/dashboard';
-
 /**
  * Real account creation — POST /api/v1/auth/register.
  * Reached from every "Get Started" call-to-action on the landing page.
  */
 export default function SignUpPage() {
-  const { register, user, loading } = useAuth();
+  const { register, signInWithGoogle, user, loading } = useAuth();
   const navigate = useNavigate();
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'buyer' | 'staff'>('buyer');
   const [company, setCompany] = useState('');
   const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -41,7 +38,17 @@ export default function SignUpPage() {
   const [submitting, setSubmitting] = useState(false);
 
   if (!loading && user) {
-    return <Navigate to={homeForRole(user.role)} replace />;
+    return <Navigate to={homePathForUser(user)} replace />;
+  }
+
+  async function handleGoogleCredential(credential: string) {
+    setFormError(null);
+    try {
+      const account = await signInWithGoogle(credential);
+      navigate(homePathForUser(account), { replace: true });
+    } catch (error) {
+      setFormError(errorMessage(error));
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -54,13 +61,13 @@ export default function SignUpPage() {
     } else if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
       nextErrors.email = 'Enter a valid email address.';
     }
-    if (password.length < 8) {
-      nextErrors.password = 'Use at least 8 characters.';
+    if (password.length < 12) {
+      nextErrors.password = 'Use at least 12 characters.';
     }
     if (password !== confirmPassword) {
       nextErrors.confirmPassword = 'Passwords must match.';
     }
-    if (role === 'buyer' && !company.trim()) {
+    if (!company.trim()) {
       nextErrors.company = 'Enter your company name.';
     }
     if (phone.trim() && !/^\+?[0-9\s-]{7,}$/.test(phone.trim())) {
@@ -77,11 +84,10 @@ export default function SignUpPage() {
         email: email.trim().toLowerCase(),
         password,
         full_name: fullName.trim(),
-        role,
         ...(company.trim() ? { company: company.trim() } : {}),
         ...(phone.trim() ? { phone: phone.trim() } : {}),
       });
-      navigate(homeForRole(account.role), { replace: true });
+      navigate(homePathForUser(account), { replace: true });
     } catch (error) {
       setFormError(errorMessage(error));
     } finally {
@@ -113,49 +119,10 @@ export default function SignUpPage() {
               Create your account
             </h1>
             <p className="mt-2 text-sm text-muted">
-              Register to place orders (buyer) or run the factory workspace
-              (staff). Admin accounts are provisioned separately.
+              Create a buyer account to place and track orders. Employee and admin accounts are provisioned by an administrator.
             </p>
 
             <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-5">
-              <fieldset>
-                <legend className="block text-sm font-medium text-ink">
-                  Account type
-                </legend>
-                <div className="mt-2 grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setRole('buyer')}
-                    aria-pressed={role === 'buyer'}
-                    className={`rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
-                      role === 'buyer'
-                        ? 'border-primary bg-primary/5 text-ink'
-                        : 'border-line bg-surface text-muted hover:border-primary/40'
-                    }`}
-                  >
-                    <span className="block font-semibold text-ink">Buyer</span>
-                    <span className="mt-0.5 block text-xs">
-                      Place and track yarn orders.
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRole('staff')}
-                    aria-pressed={role === 'staff'}
-                    className={`rounded-lg border px-3 py-3 text-left text-sm transition-colors ${
-                      role === 'staff'
-                        ? 'border-primary bg-primary/5 text-ink'
-                        : 'border-line bg-surface text-muted hover:border-primary/40'
-                    }`}
-                  >
-                    <span className="block font-semibold text-ink">Staff</span>
-                    <span className="mt-0.5 block text-xs">
-                      Factory floor &amp; admin staff.
-                    </span>
-                  </button>
-                </div>
-              </fieldset>
-
               <div>
                 <label htmlFor="fullName" className="block text-sm font-medium text-ink">
                   Full name
@@ -216,7 +183,7 @@ export default function SignUpPage() {
                       onChange={(event) => setPassword(event.target.value)}
                       aria-invalid={errors.password ? true : undefined}
                       className="h-11 w-full rounded-lg border border-line bg-surface px-3 pr-11 text-sm text-ink placeholder:text-muted/70 focus:border-primary focus:outline-2 focus:outline-primary/30"
-                      placeholder="At least 8 characters"
+                      placeholder="At least 12 characters"
                     />
                     <button
                       type="button"
@@ -262,7 +229,7 @@ export default function SignUpPage() {
               <div className="grid gap-5 sm:grid-cols-2">
                 <div>
                   <label htmlFor="company" className="block text-sm font-medium text-ink">
-                    Company {role === 'buyer' ? '' : '(optional)'}
+                  Company
                   </label>
                   <input
                     id="company"
@@ -328,6 +295,8 @@ export default function SignUpPage() {
                 )}
               </button>
             </form>
+            <div className="my-5 flex items-center gap-3 text-xs text-muted"><span className="h-px flex-1 bg-line" />or sign up with Google<span className="h-px flex-1 bg-line" /></div>
+            <GoogleSignInButton onCredential={handleGoogleCredential} />
           </div>
 
           <p className="mt-6 text-center text-xs text-muted">

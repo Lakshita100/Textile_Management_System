@@ -1,7 +1,7 @@
 """SQLAlchemy models for the Textile Management System."""
 
 from app.models.alert import StockAlert
-from app.models.auth import User, UserRole
+from app.models.auth import AttendanceRecord, User, UserRole
 from app.models.machine import Machine, MachineStatus, MachineStatusEvent
 from app.models.movement import StockMovement
 from app.models.production import (
@@ -25,6 +25,7 @@ from app.models.yarn import YarnInventory
 __all__ = [
     "User",
     "UserRole",
+    "AttendanceRecord",
     "Sequence",
     "YarnInventory",
     "Supplier",

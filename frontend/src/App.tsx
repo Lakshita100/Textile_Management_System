@@ -11,6 +11,9 @@ import QualityDashboardPage from './pages/quality/QualityDashboardPage';
 import AllInspectionsPage from './pages/quality/AllInspectionsPage';
 import PackingPage from './pages/packing/PackingPage';
 import DispatchPage from './pages/dispatch/DispatchPage';
+import AttendancePage from './pages/AttendancePage';
+import AdminEmployeesPage from './pages/AdminEmployeesPage';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 import LandingPage from './pages/LandingPage';
 import SignInPage from './pages/SignInPage';
 import SignUpPage from './pages/SignUpPage';
@@ -51,6 +54,7 @@ export default function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/signin" element={<SignInPage />} />
               <Route path="/signup" element={<SignUpPage />} />
+              <Route path="/change-password" element={<RequireAuth><ChangePasswordPage /></RequireAuth>} />
               <Route path="/login" element={<BuyerLoginPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/privacy" element={<LegalPage kind="privacy" />} />
@@ -75,10 +79,13 @@ export default function App() {
                 <Route path="incoming" element={<AdminIncomingOrdersPage />} />
                 <Route path="manual-order" element={<AdminManualOrderPage />} />
                 <Route path="inquiries" element={<AdminInquiriesPage />} />
+<Route path="employees" element={<AdminEmployeesPage />} />
+                <Route path="attendance" element={<AttendancePage />} />
                 <Route path="materials" element={<RawMaterialsPage defaultSection="inventory" hideTabs />} />
                 <Route path="alerts" element={<RawMaterialsPage defaultSection="alerts" hideTabs />} />
                 <Route path="movements" element={<RawMaterialsPage defaultSection="movements" hideTabs />} />
                 <Route path="suppliers" element={<RawMaterialsPage defaultSection="suppliers" hideTabs />} />
+                <Route path="purchases" element={<RawMaterialsPage defaultSection="purchases" hideTabs />} />
                 <Route path="production" element={<DashboardPage />} />
                 <Route path="machines" element={<MachinesPage />} />
                 <Route path="machines/:id" element={<MachineDetailPage />} />
@@ -91,21 +98,22 @@ export default function App() {
               {/* Factory management application (requires a signed-in staff/admin account) */}
               <Route element={<RequireAuth roles={['staff', 'admin']} />}>
                 <Route element={<AppShell />}>
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                  <Route path="/inventory" element={<RawMaterialsPage defaultSection="inventory" hideTabs />} />
-                  <Route path="/raw-materials" element={<RawMaterialsPage defaultSection="inventory" hideTabs />} />
-                  <Route path="/alerts" element={<RawMaterialsPage defaultSection="alerts" hideTabs />} />
-                  <Route path="/movements" element={<RawMaterialsPage defaultSection="movements" hideTabs />} />
-                  <Route path="/suppliers" element={<RawMaterialsPage defaultSection="suppliers" hideTabs />} />
-                  <Route path="/purchases" element={<RawMaterialsPage defaultSection="purchases" hideTabs />} />
-                  <Route path="/machines" element={<MachinesPage />} />
-                  <Route path="/machines/:id" element={<MachineDetailPage />} />
-                  <Route path="/jobs" element={<JobsPage />} />
-                  <Route path="/recommend" element={<RecommendPage />} />
-                  <Route path="/quality" element={<QualityDashboardPage />} />
-                  <Route path="/quality/inspections" element={<AllInspectionsPage />} />
-                  <Route path="/quality/packing" element={<PackingPage />} />
-                  <Route path="/quality/dispatch" element={<DispatchPage />} />
+                  <Route path="/dashboard" element={<RequireAuth permission="production"><DashboardPage /></RequireAuth>} />
+                  <Route path="/inventory" element={<RequireAuth permission="materials"><RawMaterialsPage defaultSection="inventory" hideTabs /></RequireAuth>} />
+                  <Route path="/raw-materials" element={<RequireAuth permission="materials"><RawMaterialsPage defaultSection="inventory" hideTabs /></RequireAuth>} />
+                  <Route path="/alerts" element={<RequireAuth permission="materials"><RawMaterialsPage defaultSection="alerts" hideTabs /></RequireAuth>} />
+                  <Route path="/movements" element={<RequireAuth permission="materials"><RawMaterialsPage defaultSection="movements" hideTabs /></RequireAuth>} />
+                  <Route path="/suppliers" element={<RequireAuth permission="materials"><RawMaterialsPage defaultSection="suppliers" hideTabs /></RequireAuth>} />
+                  <Route path="/purchases" element={<RequireAuth permission="materials"><RawMaterialsPage defaultSection="purchases" hideTabs /></RequireAuth>} />
+                  <Route path="/machines" element={<RequireAuth permission="machines"><MachinesPage /></RequireAuth>} />
+                  <Route path="/machines/:id" element={<RequireAuth permission="machines"><MachineDetailPage /></RequireAuth>} />
+                  <Route path="/jobs" element={<RequireAuth permission="production"><JobsPage /></RequireAuth>} />
+                  <Route path="/recommend" element={<RequireAuth permission="recommendations"><RecommendPage /></RequireAuth>} />
+                  <Route path="/quality" element={<RequireAuth permission="quality"><QualityDashboardPage /></RequireAuth>} />
+                  <Route path="/quality/inspections" element={<RequireAuth permission="quality"><AllInspectionsPage /></RequireAuth>} />
+                  <Route path="/quality/packing" element={<RequireAuth permission="quality"><PackingPage /></RequireAuth>} />
+                  <Route path="/quality/dispatch" element={<RequireAuth permission="dispatch"><DispatchPage /></RequireAuth>} />
+                  <Route path="/attendance" element={<RequireAuth permission="attendance"><AttendancePage /></RequireAuth>} />
                 </Route>
               </Route>
 

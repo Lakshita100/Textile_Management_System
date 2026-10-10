@@ -8,11 +8,12 @@ from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.auth import require_permission
 from app.schemas import ImportReportOut
 from app.services import csv_import
 from app.services.common import transaction
 
-router = APIRouter(prefix="/inventory", tags=["import"])
+router = APIRouter(prefix="/inventory", tags=["import"], dependencies=[Depends(require_permission("materials"))])
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB — the 10k dataset is ~1.7 MB
 

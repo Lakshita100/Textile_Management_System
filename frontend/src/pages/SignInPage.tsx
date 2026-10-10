@@ -4,23 +4,21 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CircleAlert, Loader2 } from 'lucide-react';
 import { Logo } from '../components/Logo';
 import { buttonClass } from '../components/ui/Button';
+import GoogleSignInButton from '../components/auth/GoogleSignInButton';
 import { useAuth } from '../store/AuthProvider';
-import type { AuthRole } from '../services/authService';
+import { homePathForUser } from '../services/authService';
 import { errorMessage } from '../services/http';
 
 interface FormErrors {
-  email?: string;
+  identifier?: string;
   password?: string;
 }
 
-const homeForRole = (role: AuthRole): string =>
-  role === 'admin' ? '/admin' : role === 'buyer' ? '/buyer' : '/dashboard';
-
 export default function SignInPage() {
-  const { signIn, user, loading } = useAuth();
+  const { signIn, signInWithGoogle, user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<FormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -28,18 +26,23 @@ export default function SignInPage() {
 
   if (!loading && user) {
     const from = (location.state as { from?: string } | null)?.from;
-    return <Navigate to={from ?? homeForRole(user.role)} replace />;
+    return <Navigate to={from ?? homePathForUser(user)} replace />;
+  }
+
+  async function handleGoogleCredential(credential: string) {
+    try {
+      const account = await signInWithGoogle(credential);
+      navigate(homePathForUser(account), { replace: true });
+    } catch (error) {
+      setFormError(errorMessage(error));
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const nextErrors: FormErrors = {};
-    if (!email.trim()) {
-      nextErrors.email = 'Enter your work email address.';
-    } else if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      nextErrors.email = 'Enter a valid email address.';
-    }
+    if (!identifier.trim()) nextErrors.identifier = 'Enter your employee/admin ID or buyer email.';
     if (!password) {
       nextErrors.password = 'Enter your password.';
     }
@@ -50,9 +53,9 @@ export default function SignInPage() {
 
     setSubmitting(true);
     try {
-      const account = await signIn(email.trim().toLowerCase(), password);
+      const account = await signIn(identifier.trim(), password);
       const from = (location.state as { from?: string } | null)?.from;
-      navigate(from ?? homeForRole(account.role), { replace: true });
+      navigate(from ?? homePathForUser(account), { replace: true });
     } catch (error) {
       setFormError(errorMessage(error));
     } finally {
@@ -90,30 +93,30 @@ export default function SignInPage() {
             <form onSubmit={handleSubmit} noValidate className="mt-6 space-y-5">
               <div>
                 <label
-                  htmlFor="email"
+                  htmlFor="identifier"
                   className="block text-sm font-medium text-ink"
                 >
-                  Work email
+                  Employee / Admin ID or buyer email
                 </label>
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  aria-invalid={errors.email ? true : undefined}
-                  aria-describedby={errors.email ? 'email-error' : undefined}
+                  id="identifier"
+                  name="identifier"
+                  type="text"
+                  autoComplete="username"
+                  value={identifier}
+                  onChange={(event) => setIdentifier(event.target.value)}
+                  aria-invalid={errors.identifier ? true : undefined}
+                  aria-describedby={errors.identifier ? 'identifier-error' : undefined}
                   className="mt-2 h-11 w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink placeholder:text-muted/70 focus:border-primary focus:outline-2 focus:outline-primary/30"
-                  placeholder="name@factory.com"
+                  placeholder="EMP-000123 or name@company.com"
                 />
-                {errors.email ? (
+                {errors.identifier ? (
                   <p
-                    id="email-error"
+                    id="identifier-error"
                     className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-error"
                   >
                     <CircleAlert aria-hidden className="size-3.5" />
-                    {errors.email}
+                    {errors.identifier}
                   </p>
                 ) : null}
               </div>
@@ -173,6 +176,9 @@ export default function SignInPage() {
               </button>
             </form>
 
+            <div className="my-5 flex items-center gap-3 text-xs text-muted"><span className="h-px flex-1 bg-line" />or buyer sign-in<span className="h-px flex-1 bg-line" /></div>
+            <GoogleSignInButton onCredential={handleGoogleCredential} />
+
             <div className="mt-5 flex items-center justify-between text-xs text-muted">
               <Link to="/forgot-password" className="font-medium text-primary">
                 Forgot password?
@@ -188,8 +194,8 @@ export default function SignInPage() {
             <Link to="/signup" className="font-semibold text-primary">
               Create one
             </Link>{' '}
-            — buyer and staff accounts are self-serve; admin accounts are
-            provisioned by your administrator.
+            — buyer accounts can self-register; employee and administrator IDs are
+            assigned by the factory administrator.
           </p>
         </div>
       </main>

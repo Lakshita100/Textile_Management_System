@@ -6,7 +6,6 @@ import {
   getOrdersForBuyer,
   recordDemoMaterialAvailability,
   recordOrderReviewAction,
-  signInDemo,
 } from './orderService'
 
 const createTestOrder = () => createOrderForBuyer('buyer-demo', {
@@ -44,7 +43,6 @@ describe('buyer order review workflow', () => {
       setItem: (key, value) => { values.set(key, value) },
     }
     Object.defineProperty(window, 'localStorage', { configurable: true, value: storage })
-    signInDemo('buyer@everestmills.com', 'Demo@1234')
   })
 
   it('creates a unique buyer-portal order and leaves availability unchecked', () => {
