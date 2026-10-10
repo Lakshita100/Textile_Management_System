@@ -95,8 +95,13 @@ def authenticate(db: Session, identifier: str, password: str) -> User:
         raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect email or password.")
     if user.role == UserRole.BUYER.value and "@" not in identifier:
         raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect email or password.")
-    if user.role != UserRole.BUYER.value and (not user.login_id or identifier.strip().upper() != user.login_id):
-        raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect employee or administrator ID or password.")
+    if user.role != UserRole.BUYER.value:
+        if "@" in identifier:
+            if user.email != normalized:
+                raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect email or password.")
+        else:
+            if not user.login_id or identifier.strip().upper() != user.login_id:
+                raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect employee or administrator ID or password.")
     if not user.is_active:
         raise AuthError("ACCOUNT_DISABLED", "This account has been disabled.")
     return user
