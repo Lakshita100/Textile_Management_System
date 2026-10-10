@@ -23,7 +23,7 @@ export function FinalCTA() {
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
-            <Link to="/signin" className={buttonClass('onDark', 'lg')}>
+            <Link to="/signup" className={buttonClass('onDark', 'lg')}>
               Get Started
               <ArrowRight aria-hidden className="size-4" />
             </Link>
