@@ -18,7 +18,7 @@ export default function AdminProfile() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Plant Head Profile</Text>
+        <Text style={styles.headerTitle}>Employee Head Profile</Text>
         <Text style={styles.headerSub}>Admin Controls & Gate Station Specs</Text>
       </View>
 
@@ -29,8 +29,8 @@ export default function AdminProfile() {
             <Ionicons name="shield-checkmark" size={30} color="#FFFFFF" />
           </View>
 
-          <Text style={styles.userName}>{currentUser?.name || 'Rajesh Mehta'}</Text>
-          <Text style={styles.userRole}>{currentUser?.role || 'Plant Head & Factory Admin'}</Text>
+          <Text style={styles.userName}>{currentUser?.name || 'Employee Head'}</Text>
+          <Text style={styles.userRole}>{currentUser?.role || 'Employee Head & Factory Admin'}</Text>
           <View style={styles.idBadge}>
             <Text style={styles.idBadgeText}>ID: {currentUser?.id || 'ADMIN-01'}</Text>
           </View>

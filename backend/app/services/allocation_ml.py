@@ -12,10 +12,16 @@ features → returns None (caller keeps rule-based behavior).
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
-import joblib
-import pandas as pd
+try:
+    import joblib
+    import pandas as pd
+except ImportError as e:
+    joblib = None
+    pd = None
+    logging.getLogger(__name__).warning(f"Optional ML dependencies (pandas/joblib) not found: {e}")
 
 from app.models.machine import Machine
 from app.services.scheduling import ScheduleEstimate
@@ -27,60 +33,60 @@ _cache: dict = {}
 
 
 def model_available() -> bool:
-    return ARTIFACT_PATH.exists() and META_PATH.exists()
+    return pd is not None and joblib is not None and ARTIFACT_PATH.exists() and META_PATH.exists()
 
 
 def _load() -> tuple[object, dict]:
     if "model" not in _cache:
         if not model_available():
-            raise FileNotFoundError("allocation ranker artifact missing")
+            raise FileNotFoundError("allocation ranker artifact missing or ML packages unavailable")
         _cache["model"] = joblib.load(ARTIFACT_PATH)
         _cache["meta"] = json.loads(META_PATH.read_text(encoding="utf-8"))
     return _cache["model"], _cache["meta"]
 
 
-def selection_probability(
-    machine: Machine,
+def predict_probability(
     *,
-    process: str,
-    quantity_kg: float | None,
-    schedule: ScheduleEstimate,
-    gsm: float | None = None,
-    width_cm: float | None = None,
-    fabric_type: str | None = None,
-    color: str | None = None,
-    priority: str = "NORMAL",
+    job_type: str,
+    target_date: str | None,
+    estimated_hours: float,
+    efficiency_score: float,
+    candidate: Machine,
+    est: ScheduleEstimate,
+    candidate_rank_index: int,
 ) -> float | None:
-    """Experimental: P(candidate is 'selected') per the learned heuristic. None if unavailable."""
-    try:
-        model, meta = _load()
-    except FileNotFoundError:
+    if not model_available():
         return None
 
-    defaults = meta.get("feature_defaults", {})
-    features = {
-        "process_type": (process or "").strip().upper(),
-        "fabric_type": fabric_type or defaults.get("fabric_type", "UNKNOWN"),
-        "color_family": color or defaults.get("color_family", "UNKNOWN"),
-        "priority": priority,
-        "machine_type": str(machine.machine_type).upper(),
-        "gsm": float(gsm) if gsm else float(defaults.get("gsm", 200.0)),
-        "batch_quantity_kg": float(quantity_kg) if quantity_kg else float(defaults.get("batch_quantity_kg", 500.0)),
-        "machine_capacity_kg_per_batch": float(defaults.get("machine_capacity_kg_per_batch", 500.0)),
-        "machine_nominal_rate_kg_per_hour": float(defaults.get("machine_nominal_rate_kg_per_hour", 60.0)),
-        "machine_efficiency_pct": float(defaults.get("machine_efficiency_pct", 85.0)),
-        "machine_availability_pct": float(defaults.get("machine_availability_pct", 90.0)),
-        "setup_estimate_minutes": schedule.setup_minutes,
-        "queue_wait_estimate_minutes": schedule.queue_wait_minutes,
-        "processing_time_estimate_minutes": schedule.processing_minutes,
-    }
     try:
-        order = meta["features"]["categorical"] + meta["features"]["numeric"]
-        row = pd.DataFrame([{k: features[k] for k in order}])
-        proba = model.predict_proba(row)
-        classes = list(model.named_steps["clf"].classes_)
-        if 1 not in classes:
-            return 0.0
-        return round(float(proba[0][classes.index(1)]), 4)
-    except Exception:  # experimental feature must never break the API
+        model, meta = _load()
+        feature_cols = meta.get("features", [])
+
+        # Build raw feature row
+        row = {
+            "job_type": job_type,
+            "estimated_hours": estimated_hours,
+            "efficiency_score": efficiency_score,
+            "machine_id": candidate.id,
+            "machine_status": candidate.status,
+            "available_date": est.available_date.isoformat(),
+            "start_time": est.start_time.isoformat(),
+            "completion_time": est.completion_time.isoformat(),
+            "setup_hours": est.setup_hours,
+            "process_hours": est.process_hours,
+            "candidate_rank_index": candidate_rank_index,
+        }
+
+        df = pd.DataFrame([row])
+        df_encoded = pd.get_dummies(df)
+
+        # Align with training features
+        for col in feature_cols:
+            if col not in df_encoded.columns:
+                df_encoded[col] = 0
+        df_encoded = df_encoded[feature_cols]
+
+        probs = model.predict_proba(df_encoded)
+        return float(probs[0][1])
+    except Exception:
         return None

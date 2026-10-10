@@ -33,7 +33,7 @@ export default function AdminHome() {
           </View>
           <View>
             <Text style={styles.brandTitle}>TEXTILE MANAGEMENT SYSTEM</Text>
-            <Text style={styles.brandSub}>Plant Head Portal • Main Gate</Text>
+            <Text style={styles.brandSub}>Employee Head Portal • Main Gate</Text>
           </View>
         </View>
 
@@ -43,14 +43,14 @@ export default function AdminHome() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Plant Head Card */}
+        {/* Employee Head Card */}
         <View style={styles.adminCard}>
           <View style={styles.avatar}>
             <Ionicons name="shield-checkmark" size={22} color="#FFFFFF" />
           </View>
           <View style={styles.adminDetails}>
-            <Text style={styles.adminName}>{currentUser?.name || 'Rajesh Mehta'}</Text>
-            <Text style={styles.adminRole}>Plant Head • ID: {currentUser?.id || 'ADMIN-01'}</Text>
+            <Text style={styles.adminName}>{currentUser?.name || 'Employee Head'}</Text>
+            <Text style={styles.adminRole}>Employee Head • ID: {currentUser?.id || 'ADMIN-01'}</Text>
           </View>
         </View>
 
