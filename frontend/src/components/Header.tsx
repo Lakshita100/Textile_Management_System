@@ -72,12 +72,12 @@ export function Header() {
 
         <div className="hidden shrink-0 items-center gap-3 lg:flex">
           <Link
-            to="/signin"
+            to="/login"
             className={buttonClass('secondary', 'md', 'hidden xl:inline-flex')}
           >
             Sign In
           </Link>
-          <Link to="/signin" className={buttonClass('primary', 'md')}>
+          <Link to="/signup" className={buttonClass('primary', 'md')}>
             Get Started
             <ArrowRight aria-hidden className="size-4" />
           </Link>
@@ -129,14 +129,14 @@ export function Header() {
           </ul>
           <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4">
             <Link
-              to="/signin"
+              to="/login"
               onClick={() => setMenuOpen(false)}
               className={buttonClass('secondary', 'md')}
             >
               Sign In
             </Link>
             <Link
-              to="/signin"
+              to="/signup"
               onClick={() => setMenuOpen(false)}
               className={buttonClass('primary', 'md')}
             >

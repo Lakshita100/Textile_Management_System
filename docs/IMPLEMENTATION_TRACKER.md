@@ -101,6 +101,17 @@ Persistent quality backend replacing Anand's in-memory demo, frontend API wiring
 
 Anand's recorded session evidence (from his tracker, condensed): `npm run build` (`tsc -b && vite build`) passed across 7 sessions; `oxlint` 0 findings; preview server HTTP 200 on `/quality`, `/quality/inspections`, `/quality/inspection`; no reference images in repo for visual comparison; no unit tests written at his side.
 
+## Module 04 — Buyer order and Ram review prototype (2026-10-10)
+
+- [x] Buyer requirements form with profile details, validation, review step, duplicate-submit guard, unique Order ID, and submission confirmation
+- [x] Shared browser-local order store feeds buyer order/tracking pages and Ram's incoming/review pages
+- [x] Maahi boundary clearly reports integration pending; Ram-entered availability is labelled demo data and linked by Order ID
+- [x] Review history/internal notes are separate from buyer-visible updates; approval requires an available demo check and explicit requirements confirmation
+- [x] Clarification responses return an order to review; accepted orders are exposed to Lakshita's production-planning boundary with the same Order ID
+- [x] Focused workflow tests: `npx vitest run src/services/orderService.test.ts` → **4 passed**
+- [x] Browser acceptance pass: buyer submitted, Ram recorded a labelled check/internal note and approved, production boundary showed the same ID, and buyer saw approval without the internal note
+- [!] Live order/material APIs, persistence and production authentication remain pending; this is a browser-local prototype, not a deployed Module 04 service
+
 ## Phase 8 — Final testing and handoff
 
 - [x] Backend test suite passes (**81 passed**); frontend build + typecheck pass (success); frontend tests **10 passed**; oxlint 0 errors (2 pre-existing warnings)
@@ -161,3 +172,7 @@ Anand's recorded session evidence (from his tracker, condensed): `npm run build`
 | 2026-10-10 | Quality: packing/dispatch | `npm run build` | success -- 2282 modules, 713 kB js / 16.8 kB css (chunk-size warning only) |
 | 2026-10-10 | Quality: packing/dispatch | `npm run lint` | oxlint clean on all new files; 2 pre-existing warnings remain in Feature 02 pages (Jobs.tsx, Analytics.tsx) - untouched to avoid merge conflicts |
 | 2026-10-10 | Quality: packing/dispatch | preview HTTP check | `/quality/packing` and `/quality/dispatch` -> HTTP 200 (vite preview :4180) |
+
+| 2026-10-10 | Module 04 demo | `npx vitest run src/services/orderService.test.ts` | **4 passed** — ID, material state, approval gate, private notes and clarification response |
+| 2026-10-10 | Module 04 demo | `npm run build` (frontend) | TypeScript + Vite **success** |
+| 2026-10-10 | Module 04 demo | Browser end-to-end workflow | Buyer submit → Ram review/demo material check/note/approve → production boundary; buyer status visible and internal note not exposed |
