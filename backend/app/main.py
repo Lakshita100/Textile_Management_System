@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api import api_router
 from app.api.routers import alerts, imports, inventory, movements, purchases, suppliers
 from app.config import settings
 from app.database import check_db_connection
@@ -16,9 +17,9 @@ def create_app() -> FastAPI:
         title=settings.APP_NAME,
         version="1.0.0",
         description=(
-            "REST API for the Smart Yarn Inventory module: yarn inventory, stock "
-            "movements, low-stock alerts, supplier management and purchase request "
-            "drafts. All numbers are computed from the database."
+            "REST API for the Textile Management System: yarn inventory, stock "
+            "movements, low-stock alerts, supplier management, purchase requests, "
+            "machines, production, quality, and recommendations."
         ),
         docs_url="/docs",
         redoc_url="/redoc",
@@ -44,12 +45,16 @@ def create_app() -> FastAPI:
             "environment": settings.ENVIRONMENT,
         }
 
+    # Core yarn inventory modules
     app.include_router(inventory.router, prefix=settings.API_PREFIX)
     app.include_router(suppliers.router, prefix=settings.API_PREFIX)
     app.include_router(movements.router, prefix=settings.API_PREFIX)
     app.include_router(alerts.router, prefix=settings.API_PREFIX)
     app.include_router(purchases.router, prefix=settings.API_PREFIX)
     app.include_router(imports.router, prefix=settings.API_PREFIX)
+
+    # Production, quality, scheduling, and machines modules
+    app.include_router(api_router, prefix=settings.API_PREFIX)
 
     return app
 

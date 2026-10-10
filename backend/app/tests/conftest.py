@@ -23,7 +23,16 @@ from sqlalchemy import delete  # noqa: E402
 from app.database import SessionLocal  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import (  # noqa: E402
+    InspectionOutcome,
+    Machine,
+    MachineDowntime,
+    MachineRecommendation,
+    MachineStatusEvent,
+    ProductionJob,
+    ProductionJobStatusEvent,
     PurchaseRequest,
+    QualityInspection,
+    RecommendationDecision,
     Sequence,
     StockAlert,
     StockMovement,
@@ -61,6 +70,14 @@ def db():
 def clean_tables(db):
     """Every test starts from an empty database."""
     for model in (
+        QualityInspection,
+        RecommendationDecision,
+        MachineRecommendation,
+        MachineDowntime,
+        ProductionJobStatusEvent,
+        ProductionJob,
+        MachineStatusEvent,
+        Machine,
         PurchaseRequest,
         StockAlert,
         StockMovement,

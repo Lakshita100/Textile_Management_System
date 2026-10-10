@@ -9,7 +9,7 @@ import {
   getMachines,
   previewRollId,
 } from '../../services/qualityService'
-import type { ActiveJob, DefectSeverity } from '../../types/quality'
+import type { ActiveJob, DefectSeverity, MachineRef } from '../../types/quality'
 
 interface FormDefect {
   type: string
@@ -25,6 +25,12 @@ type JobState = { status: 'none' } | { status: 'loading' } | JobOutcome
 
 const SEVERITIES: DefectSeverity[] = ['Low', 'Medium', 'High']
 
+const STATUS_LABEL: Record<string, string> = {
+  IN_PROGRESS: 'Running',
+  PAUSED: 'Paused',
+  COMPLETED: 'Completed',
+}
+
 function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -35,7 +41,8 @@ const inputClass = (hasError: boolean) =>
 export default function InspectionFormModal() {
   const { closeForm } = useInspectionForm()
   const { employee } = useSession()
-  const machines = getMachines()
+  const [machines, setMachines] = useState<MachineRef[]>([])
+  const [machinesError, setMachinesError] = useState<string | null>(null)
   const machineRef = useRef<HTMLSelectElement>(null)
 
   const [machineId, setMachineId] = useState('')
@@ -45,13 +52,30 @@ export default function InspectionFormModal() {
   const [remarks, setRemarks] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [jobResult, setJobResult] = useState<{ machineId: string; outcome: JobOutcome } | null>(null)
+  const [rollPreview, setRollPreview] = useState<{ jobId: number; rollId: string } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [created, setCreated] = useState<{
-    id: string
+    id: number
     rollId: string
     toWarehouse: number
   } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getMachines()
+      .then((m) => {
+        if (!cancelled) setMachines(m)
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setMachinesError(err instanceof Error ? err.message : 'Could not load machines.')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     machineRef.current?.focus()
@@ -69,10 +93,24 @@ export default function InspectionFormModal() {
 
   useEffect(() => {
     if (!machineId) return
+    const machine = machines.find((m) => m.id === machineId)
+    if (!machine) return // machines still loading (or unknown selection)
     let cancelled = false
-    getMachineJob(machineId)
+    getMachineJob(machine.machineId)
       .then((job) => {
-        if (!cancelled) setJobResult({ machineId, outcome: { status: 'ready', job } })
+        if (cancelled) return
+        setJobResult({ machineId, outcome: { status: 'ready', job } })
+        if (job) {
+          previewRollId(job.jobId)
+            .then((rollId) => {
+              if (!cancelled) setRollPreview({ jobId: job.jobId, rollId })
+            })
+            .catch(() => {
+              if (!cancelled) setRollPreview(null)
+            })
+        } else {
+          setRollPreview(null)
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -83,12 +121,13 @@ export default function InspectionFormModal() {
               message: err instanceof Error ? err.message : 'Could not load the active batch.',
             },
           })
+          setRollPreview(null)
         }
       })
     return () => {
       cancelled = true
     }
-  }, [machineId])
+  }, [machineId, machines])
 
   const jobState: JobState = !machineId
     ? { status: 'none' }
@@ -106,6 +145,9 @@ export default function InspectionFormModal() {
     const next: Record<string, string> = {}
     if (!machineId) next.machineId = 'Select a machine.'
     else if (!activeJob) next.machineId = 'This machine is idle - select a machine with an active batch.'
+    else if (activeJob.producedQtyMeters <= 0) {
+      next.machineId = 'This batch has no recorded output yet - nothing to inspect.'
+    }
 
     defects.forEach((defect, index) => {
       if (!defect.type) next[`defect-${index}`] = 'Choose a type or remove this row.'
@@ -130,10 +172,10 @@ export default function InspectionFormModal() {
     setSubmitting(true)
     try {
       const result = await createInspection({
-        batchNo: activeJob.batchNo,
-        orderId: activeJob.orderId,
-        machineId,
+        jobId: activeJob.jobId,
+        machineCode: activeJob.machineId,
         employeeId: employee.id,
+        inspectorName: employee.name,
         inspectedAt: today(),
         inspectedQtyMeters: activeJob.producedQtyMeters,
         defects: defects.map((d) => ({
@@ -205,7 +247,7 @@ export default function InspectionFormModal() {
               aria-live="polite"
             >
               <p className="text-sm font-semibold text-title">
-                {created.id} saved - roll {created.rollId} - {created.toWarehouse} m to warehouse
+                Inspection #{created.id} saved - roll {created.rollId} - {created.toWarehouse} m to warehouse
               </p>
               <div className="mt-2 flex gap-4 text-sm">
                 <button type="button" className="btn-primary px-3 py-1.5" onClick={closeForm}>
@@ -261,6 +303,11 @@ export default function InspectionFormModal() {
                   <span aria-hidden="true">! </span>
                   {errors.machineId}
                 </p>
+              ) : machinesError ? (
+                <p role="alert" className="text-sm font-medium text-title">
+                  <span aria-hidden="true">! </span>
+                  {machinesError}
+                </p>
               ) : null}
             </div>
 
@@ -280,10 +327,15 @@ export default function InspectionFormModal() {
                 </div>
               ) : jobState.job ? (
                 <div>
-                  {row('Status', 'Running')}
+                  {row('Status', STATUS_LABEL[jobState.job.status] ?? jobState.job.status)}
                   {row('Batch no', jobState.job.batchNo)}
                   {row('Order', jobState.job.orderId)}
-                  {row('Roll ID', previewRollId(jobState.job.batchNo))}
+                  {row(
+                    'Roll ID',
+                    rollPreview && rollPreview.jobId === jobState.job.jobId
+                      ? rollPreview.rollId
+                      : '...',
+                  )}
                   {row('Output', `${jobState.job.producedQtyMeters} of ${jobState.job.plannedQtyMeters} m`)}
                   {row('Inspected', `${jobState.job.producedQtyMeters} m`)}
                   {row('Date', today())}

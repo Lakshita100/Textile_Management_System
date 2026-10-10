@@ -40,7 +40,12 @@ class Settings(BaseSettings):
     REC_WEIGHT_WORKLOAD: float = 0.35
     REC_WEIGHT_QUALITY: float = 0.25
     REC_ALGORITHM_VERSION: str = "rule-based-v1"
-    REC_NEUTRAL_SCORE: float = 50.0
+    REC_NEUTRAL_SCORE: float = 50.0  # documented fallback for unknown metrics (never 100)
+    REC_MIN_QUALITY_SAMPLES: int = 3  # persisted inspections needed before quality enters scoring
+
+    # Scheduling engine (Phase D) — documented assumptions
+    REC_PLANNING_HORIZON_DAYS: int = 14
+    REC_SETUP_DEFAULT_MINUTES: float = 15.0  # machine model has no setup column yet
 
 
 settings = Settings()

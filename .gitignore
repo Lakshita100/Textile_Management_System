@@ -81,3 +81,6 @@ pnpm-debug.log*
 
 # Private AI working folder (local-only; never publish)
 /ai/
+
+# Generated ML model artifacts (retrain via backend/scripts/train_*.py)
+backend/mlartifacts/
