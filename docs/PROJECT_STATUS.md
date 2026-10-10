@@ -1,7 +1,7 @@
 # Project Status — Source of Truth (shared)
 
-**Last repository audit:** 2026-10-10 (branch `main`, commit `0b1851f` = `origin/main` at start of the Feature 02 × Module 03 integration; this changeset contains that integration — index intentionally left clean/uncommitted pending approval).
-**Overall implementation status:** **Feature 02 (Production & Machine Tracking, incl. ML scheduling) + Module 03 quality backend/frontend integration implemented and verified end-to-end. Modules 01/04 not yet in this repository.**
+**Last repository audit:** 2026-10-10 (main branch at start of Feature 02 × Module 03 integration; see evidence below).
+**Overall implementation status:** **Feature 02 and Module 03 quality backend/frontend integration implemented and verified end-to-end. Ram's buyer/admin order workflow is implemented and browser-verified as a local-storage prototype; Module 01/04 APIs and production persistence remain unavailable.**
 
 This file records only what has been inspected in the repository with evidence. Plans, mockups and generated-but-untested code are never counted as implemented.
 
@@ -26,6 +26,7 @@ This file records only what has been inspected in the repository with evidence. 
 - Demo seed data (`backend/scripts/seed_demo.py`) is labeled DEVELOPMENT FIXTURES.
 - **Merge of `origin/anand` (Module 03 quality frontend, 2026-10-10):** branch based on `d9cd758` merged into `main` with 11 conflicts resolved — his `ai/` tracker edits kept local-only and ported into `docs/`; his frontend merged under `/quality` routes beside Feature 02's app; shared theme CSS identical on both branches. Post-merge: `npm run build` success (2277 modules), `npm test` 3 passed, `npm run lint` runs (2 pre-existing warnings).
 - **Feature 02 × Module 03 integration (2026-10-10):** persistent `quality_inspections` table (migration `b7f3d2c1a9e4`) + `/api/v1/quality/*` service/router replacing Anand's in-memory demo data; frontend qualityService rewritten API-backed; Jobs ↔ Quality cross-links; analytics defect rate and recommendation quality term now computed from persisted inspections (neutral-50 + explicit per-candidate warnings below 3 samples); per-machine advisory locking for scheduling under concurrency. Evidence: `python -m pytest -q` → **81 passed**; `npm test` → **10 passed**; build ✓; lint ✓ (2 pre-existing warnings); live server e2e → **37/37 checks** incl. 5× parallel double-approve/double-create at exactly one success each and a direct two-connection `pg_advisory_xact_lock` blocking proof; `alembic check` → no drift; dataset untouched/untracked; nothing staged or committed.
+- **Ram order workflow prototype (2026-10-10):** buyer form, local-storage order register, order-specific admin review, buyer-visible clarifications/status messages, and a manually entered, explicitly labelled demo material check are implemented. No Maahi or order API is wired; see the module-specific status below.
 
 ## Status matrix
 
@@ -48,10 +49,10 @@ This file records only what has been inspected in the repository with evidence. 
 | Scheduling API | Implemented and verified | `POST /api/v1/scheduling/estimate-duration`, `GET /api/v1/scheduling/machines/{id}/timeline` with coded 404/422/503 errors — live-smoked |
 | Scheduling concurrency (multi-worker) | Implemented and verified | Per-machine `pg_advisory_xact_lock` (ns 741202) in `create_job`; approval revalidates under row lock + machine lock in one transaction; machine status changes take the same lock (approval-vs-status TOCTOU closed); live proof: 5× parallel double-approve/double-create → one success each; direct two-connection lock blocking test; SQLite path documented as no-op |
 | ML scheduling frontend | Implemented and verified | Recommend: schedule detail card, Processing/Start→Completion/ML P(select) columns (experimental label); MachineDetail: 14-day timeline + assumptions/warnings; Jobs: planned window column |
-| Module 01 Raw Materials (Maahi) | Not implemented | Material gate served by labeled FIXTURE adapter |
+| Module 01 Raw Materials (Maahi) | Not implemented | No inventory API/schema; Ram's review page stays integration-pending unless a clearly labelled manual demo check is recorded |
 | Module 03 Quality — backend | Implemented and verified | `quality_inspections` (migration `b7f3d2c1a9e4`) + `/api/v1/quality/*`: eligibility, qty caps, cross-checks, server-derived batch/roll/outcome, disposition updates, dashboard, roll preview, inspectable job, per-job counts; coded 409/404 errors |
 | Module 03 Quality — frontend (Anand) | Implemented and verified (API-backed) | Dashboard, All Inspections, modal form at `/quality` now read/write the persistent API (no in-memory demo data); Jobs ↔ Quality cross-links; employee session switcher remains demo-only |
-| Module 04 Orders (Ram) | Not implemented | Order refs served by labeled FIXTURE adapter |
+| Module 04 Orders (Ram) | Frontend demo implemented and verified | Buyer request, same-ID incoming review, material-check boundary, reviewer decisions, buyer clarification/status updates; browser local storage only, no API/database/auth |
 | Modules 05/06 (Warehouse, Employees/Accounts) | Not implemented | Owners TBD |
 | Authentication / RBAC | Not implemented | Config placeholders removed pending design; supervisor approval currently records approver name only |
 | Backend tests | Implemented and verified | `python -m pytest -q` → **81 passed** (29 Feature 02 baseline + 32 ML/scheduling + 20 quality/concurrency) |
@@ -61,7 +62,7 @@ This file records only what has been inspected in the repository with evidence. 
 
 ## Known risks
 
-1. **Feature 02 still depends on two modules (01/04) that do not exist in this repository; Module 03 is now integrated as a persistent backend.** FIXTURE adapters for inventory/orders are labeled and swappable; contracts must be confirmed with Maahi and Ram before real integration (Phase 1 items remain open).
+1. **Live integrations remain incomplete.** Module 01 inventory and Module 04 order APIs do not exist here; the buyer/admin order prototype is local-storage-only, and the manually entered Maahi demo check is not live stock. Contracts must be confirmed with Maahi and Ram before integration.
 2. **Auth/RBAC is not implemented.** Supervisor approval persists the approver name but there is no identity/role enforcement yet — required before real deployment.
 3. Analytics defect-rate and recommendation quality-score now read persisted `quality_inspections`; below 3 linked samples they show neutral-50 / `null` with explicit warnings (never fabricated). Anand's employee session switcher on the quality form is still demo-only (no auth).
 4. Demo/seed rows (DEVELOPMENT FIXTURES) and earlier manual test rows live in the local PostgreSQL database; a fresh clone must run `alembic upgrade head` (and optionally the seed script).

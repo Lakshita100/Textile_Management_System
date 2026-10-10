@@ -15,15 +15,13 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_TEST_DIR / 'test.db'}"
 os.environ["ECHO_SQL"] = "False"
 
 import pytest  # noqa: E402
-from alembic import command as alembic_command  # noqa: E402
-from alembic.config import Config as AlembicConfig  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import delete  # noqa: E402
 
-from app.database import SessionLocal  # noqa: E402
+import app.models  # noqa: E402
+from app.database import Base, SessionLocal, engine  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import (  # noqa: E402
-    InspectionOutcome,
     Machine,
     MachineDowntime,
     MachineRecommendation,
@@ -32,7 +30,6 @@ from app.models import (  # noqa: E402
     ProductionJobStatusEvent,
     PurchaseRequest,
     QualityInspection,
-    RecommendationDecision,
     Sequence,
     StockAlert,
     StockMovement,
@@ -48,10 +45,7 @@ BACKEND_ROOT = REPO_ROOT / "backend"
 
 
 def _upgrade_schema() -> None:
-    config = AlembicConfig(str(BACKEND_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
-    config.set_main_option("sqlalchemy.url", os.environ["DATABASE_URL"])
-    alembic_command.upgrade(config, "head")
+    Base.metadata.create_all(bind=engine)
 
 
 _upgrade_schema()
@@ -71,7 +65,6 @@ def clean_tables(db):
     """Every test starts from an empty database."""
     for model in (
         QualityInspection,
-        RecommendationDecision,
         MachineRecommendation,
         MachineDowntime,
         ProductionJobStatusEvent,
@@ -97,3 +90,36 @@ def clean_tables(db):
 def client():
     with TestClient(app) as test_client:
         yield test_client
+
+
+@pytest.fixture()
+def db_session(db):
+    return db
+
+
+@pytest.fixture()
+def machine_factory(db):
+    _counter = [0]
+
+    def _create(**kwargs):
+        _counter[0] += 1
+        num = _counter[0]
+        capacity = kwargs.pop("capacity", 500.0)
+        status = kwargs.pop("status", Machine.status.type.enums[0] if hasattr(Machine.status, "type") else "IDLE")
+        m = Machine(
+            code=kwargs.pop("code", f"MCH-{num:04d}"),
+            name=kwargs.pop("name", f"Machine {num}"),
+            machine_type=kwargs.pop("machine_type", "Weaving Machine"),
+            supported_processes=kwargs.pop("supported_processes", "WEAVING,DYEING"),
+            capacity_value=capacity,
+            capacity_unit=kwargs.pop("capacity_unit", "meters/hr"),
+            status=status,
+            **kwargs,
+        )
+        db.add(m)
+        db.commit()
+        db.refresh(m)
+        return m
+
+    return _create
+

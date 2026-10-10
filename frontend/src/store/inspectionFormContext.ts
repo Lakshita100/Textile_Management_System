@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
 export interface InspectionFormContextValue {
-  openForm: () => void
+  openForm: (machineId?: string) => void
   closeForm: () => void
 }
 

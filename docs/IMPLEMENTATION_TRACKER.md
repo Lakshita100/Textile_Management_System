@@ -101,6 +101,17 @@ Persistent quality backend replacing Anand's in-memory demo, frontend API wiring
 
 Anand's recorded session evidence (from his tracker, condensed): `npm run build` (`tsc -b && vite build`) passed across 7 sessions; `oxlint` 0 findings; preview server HTTP 200 on `/quality`, `/quality/inspections`, `/quality/inspection`; no reference images in repo for visual comparison; no unit tests written at his side.
 
+## Module 04 — Buyer order and Ram review prototype (2026-10-10)
+
+- [x] Buyer requirements form with profile details, validation, review step, duplicate-submit guard, unique Order ID, and submission confirmation
+- [x] Shared browser-local order store feeds buyer order/tracking pages and Ram's incoming/review pages
+- [x] Maahi boundary clearly reports integration pending; Ram-entered availability is labelled demo data and linked by Order ID
+- [x] Review history/internal notes are separate from buyer-visible updates; approval requires an available demo check and explicit requirements confirmation
+- [x] Clarification responses return an order to review; accepted orders are exposed to Lakshita's production-planning boundary with the same Order ID
+- [x] Focused workflow tests: `npx vitest run src/services/orderService.test.ts` → **4 passed**
+- [x] Browser acceptance pass: buyer submitted, Ram recorded a labelled check/internal note and approved, production boundary showed the same ID, and buyer saw approval without the internal note
+- [!] Live order/material APIs, persistence and production authentication remain pending; this is a browser-local prototype, not a deployed Module 04 service
+
 ## Phase 8 — Final testing and handoff
 
 - [x] Backend test suite passes (**81 passed**); frontend build + typecheck pass (success); frontend tests **10 passed**; oxlint 0 errors (2 pre-existing warnings)
@@ -153,3 +164,6 @@ Anand's recorded session evidence (from his tracker, condensed): `npm run build`
 | 2026-10-10 | 02×03 concurrency | direct psycopg2 two-connection `pg_advisory_xact_lock(741202, 4242)` | worker 2 blocked ~1.5 s (`LockNotAvailable` under `lock_timeout`), acquired after worker 1 rollback — DB-level serialization proven |
 | 2026-10-10 | 02×03 integration | dataset integrity | `dataset/textile_production_scheduling_dataset/` untouched, still untracked; `git status` shows nothing staged |
 | 2026-10-10 | 02×03 concurrency | status-change lock fix (audit F1) + `test_status_change_takes_machine_lock` | status PATCH acquires machine advisory lock before transition validation/commit; non-status PATCH does not lock; suite green after fix |
+| 2026-10-10 | Module 04 demo | `npx vitest run src/services/orderService.test.ts` | **4 passed** — ID, material state, approval gate, private notes and clarification response |
+| 2026-10-10 | Module 04 demo | `npm run build` (frontend) | TypeScript + Vite **success** |
+| 2026-10-10 | Module 04 demo | Browser end-to-end workflow | Buyer submit → Ram review/demo material check/note/approve → production boundary; buyer status visible and internal note not exposed |

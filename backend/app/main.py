@@ -8,7 +8,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import api_router
 from app.api.routers import alerts, imports, inventory, movements, purchases, suppliers
 from app.config import settings
-from app.database import check_db_connection
+from app.database import Base, check_db_connection, engine
+import app.models  # noqa: F401
 from app.utils.errors import register_exception_handlers
 
 
@@ -25,6 +26,12 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
     )
+
+    # Ensure all tables (machines, production_jobs, quality_inspections, etc.) exist in Supabase
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        print(f"Warning creating tables: {e}")
 
     app.add_middleware(
         CORSMiddleware,

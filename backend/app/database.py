@@ -18,14 +18,23 @@ class Base(DeclarativeBase):
 def _build_engine(url: str) -> Engine:
     """Create the engine with engine-specific connection options."""
     connect_args: dict = {}
+    extra_kwargs: dict = {}
     if url.startswith("sqlite"):
         connect_args = {"timeout": 30, "check_same_thread": False}
+    else:
+        extra_kwargs = {
+            "pool_size": 5,
+            "max_overflow": 10,
+            "pool_pre_ping": True,
+            "pool_recycle": 300,
+        }
 
     engine = create_engine(
         url,
         echo=settings.ECHO_SQL if hasattr(settings, "ECHO_SQL") else False,
         future=True,
         connect_args=connect_args,
+        **extra_kwargs,
     )
 
     if url.startswith("sqlite"):
