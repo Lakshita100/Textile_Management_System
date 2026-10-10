@@ -45,7 +45,20 @@ This repository is at the **initial scaffold stage**:
 | React application | Not implemented yet |
 | Seed data, tests | Not implemented yet |
 
-Design tokens and AI collaboration rules for upcoming UI work live in [`ai/`](ai/) — see [`ai/README_FIRST.md`](ai/README_FIRST.md). The exact color palette is defined in `ai/frontend/src/styles/theme.css`; never invent a new brand palette.
+The approved global theme and design tokens are version-controlled at [`frontend/src/styles/theme.css`](frontend/src/styles/theme.css) and [`frontend/src/styles/global.css`](frontend/src/styles/global.css); never invent a new brand palette.
+
+## Team module ownership
+
+| Module | Owner |
+|---|---|
+| 01 — Raw Material and Supplier Management | Maahi |
+| 02 — Production & Machine Tracking (machine recommendation, analytics) | Lakshita |
+| 03 — Quality Management | Anand |
+| 04 — Order Management | Ram |
+| 05 — Warehouse, Dispatch and Logistics | TBD |
+| 06 — Employee, Attendance and Accounts | TBD |
+
+Lakshita also owns the **platform foundation** required for Feature 02 (FastAPI app shell, database session/migration tooling, health endpoints, and the frontend application shell where missing) — scoped to what Feature 02 needs, confirmed 2026-10-10.
 
 ## Repository Structure
 
@@ -140,8 +153,13 @@ npm test
 
 ## Documentation
 
-- `docs/API_CONTRACT.md` — REST API contract (planned)
-- `docs/SCHEMA.md` — database schema documentation (planned)
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system architecture, module boundaries, data ownership, Feature 02 scope, design system
+- [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — Feature 02 stage roadmap with acceptance criteria
+- [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) — evidence-based implementation status (source of truth)
+- [`docs/IMPLEMENTATION_TRACKER.md`](docs/IMPLEMENTATION_TRACKER.md) — phase checklist and verification evidence log
+- [`docs/PREREQUISITES_AND_SETUP.md`](docs/PREREQUISITES_AND_SETUP.md) — toolchain, environment and test commands
+- [`docs/DATA_SOURCES_AND_INTEGRATION.md`](docs/DATA_SOURCES_AND_INTEGRATION.md) — data owners, dependency contracts, dataset/ML policy
+- [`docs/API_CONTRACTS.md`](docs/API_CONTRACTS.md) — API conventions and proposed Feature 02 endpoints
 - Swagger/OpenAPI UI at `http://localhost:8000/docs` once the backend is running
 
 ## Environment Variables

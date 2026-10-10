@@ -78,3 +78,6 @@ pnpm-debug.log*
 
 # Alembic
 *.log
+
+# Private AI working folder (local-only; never publish)
+/ai/
