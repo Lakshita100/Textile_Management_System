@@ -4,6 +4,7 @@ import {
   ClipboardList,
   Cog,
   Factory,
+  Info,
   LayoutDashboard,
   Search,
   ShieldCheck,
@@ -38,10 +39,10 @@ const SIDEBAR_ICONS = {
 } as const;
 
 const KPI_ACCENT: Record<string, string> = {
-  stock: 'bg-accent/10 text-accent',
+  stock: 'bg-primary/10 text-primary',
   orders: 'bg-primary/10 text-primary',
-  machines: 'bg-purple/10 text-purple',
-  production: 'bg-warning/10 text-warning',
+  machines: 'bg-primary/10 text-primary',
+  production: 'bg-accent/10 text-accent',
 };
 
 const MACHINE_SEGMENT_STROKE: Record<string, string> = {
@@ -122,33 +123,61 @@ function ProductionChart() {
         </span>
       </div>
 
-      <div className="mt-5 flex h-40 items-end gap-2 sm:gap-3">
-        {DEMO_PRODUCTION_WEEK.map((entry, index) => {
-          const height = Math.round(
-            (entry.meters / DEMO_PRODUCTION_CHART_MAX) * 100,
-          );
-          const isLatest = index === DEMO_PRODUCTION_WEEK.length - 1;
-          return (
-            <div
-              key={entry.day}
-              className="flex flex-1 flex-col items-center gap-2"
-            >
-              <div className="flex w-full flex-1 items-end">
+      <div className="mt-4 grid h-44 grid-cols-[2rem_minmax(0,1fr)] gap-x-2">
+        <div
+          aria-hidden
+          className="flex h-full flex-col justify-between pb-7 text-[9px] tabular-nums text-muted"
+        >
+          <span>{(DEMO_PRODUCTION_CHART_MAX / 1000).toFixed(1)}k</span>
+          <span>{((DEMO_PRODUCTION_CHART_MAX * 2) / 3000).toFixed(1)}k</span>
+          <span>{((DEMO_PRODUCTION_CHART_MAX * 1) / 3000).toFixed(1)}k</span>
+          <span>0</span>
+        </div>
+        <div
+          role="img"
+          aria-label="Illustrative daily production, in meters, for the last seven days"
+          className="relative min-w-0"
+        >
+          <div
+            aria-hidden
+            className="absolute inset-x-0 top-0 bottom-7 flex flex-col justify-between"
+          >
+            <span className="border-t border-dashed border-line" />
+            <span className="border-t border-dashed border-line" />
+            <span className="border-t border-dashed border-line" />
+            <span className="border-t border-line" />
+          </div>
+          <div className="absolute inset-x-0 top-0 bottom-7 grid grid-cols-7 items-end gap-2 sm:gap-3">
+            {DEMO_PRODUCTION_WEEK.map((entry, index) => {
+              const height = Math.round(
+                (entry.meters / DEMO_PRODUCTION_CHART_MAX) * 100,
+              );
+              const isLatest = index === DEMO_PRODUCTION_WEEK.length - 1;
+              return (
                 <div
-                  className={cx(
-                    'w-full rounded-t-sm',
-                    isLatest ? 'bg-accent' : 'bg-primary/60',
-                  )}
-                  style={{ height: `${height}%` }}
+                  key={entry.day}
+                  className="flex h-full min-w-0 items-end"
                   title={`${entry.day}: ${entry.meters.toLocaleString()} m`}
-                />
-              </div>
-              <span className="text-[10px] font-medium text-muted">
+                >
+                  <div
+                    className={cx(
+                      'w-full rounded-t-sm',
+                      isLatest ? 'bg-accent' : 'bg-primary/70',
+                    )}
+                    style={{ height: `${height}%` }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="absolute inset-x-0 bottom-0 grid h-6 grid-cols-7 items-end gap-2 text-center sm:gap-3">
+            {DEMO_PRODUCTION_WEEK.map((entry) => (
+              <span key={entry.day} className="text-[10px] font-medium text-muted">
                 {entry.day}
               </span>
-            </div>
-          );
-        })}
+            ))}
+          </div>
+        </div>
       </div>
       <p className="mt-3 text-[11px] text-muted">
         5,230 m produced today · sample data
@@ -342,7 +371,7 @@ export function DashboardMock() {
             Search orders, rolls, materials…
           </div>
           <span className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-line bg-canvas px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
-            <TriangleAlert aria-hidden className="size-3 text-warning" />
+            <Info aria-hidden className="size-3 text-primary" />
             Sample data
           </span>
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">

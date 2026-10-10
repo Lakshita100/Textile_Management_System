@@ -20,7 +20,7 @@ const STEP_ICONS = {
 
 export function WorkflowSection() {
   return (
-    <section id="solutions" className="scroll-mt-24 bg-canvas py-20 lg:py-28">
+    <section id="solutions" className="scroll-mt-24 bg-canvas py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="reveal">
           <SectionHeading
@@ -31,7 +31,7 @@ export function WorkflowSection() {
         </div>
 
         <div className="reveal">
-          <ol className="mt-14 space-y-8 lg:mt-16 lg:grid lg:grid-cols-6 lg:gap-5 lg:space-y-0">
+          <ol className="mt-12 space-y-8 lg:mt-14 lg:grid lg:grid-cols-3 lg:gap-x-8 lg:gap-y-10 lg:space-y-0 xl:grid-cols-6 xl:gap-x-5">
             {DEMO_WORKFLOW.map((step, index) => {
               const Icon = STEP_ICONS[step.icon];
               const isLast = index === DEMO_WORKFLOW.length - 1;
@@ -43,13 +43,13 @@ export function WorkflowSection() {
                   {!isLast ? (
                     <span
                       aria-hidden
-                      className="absolute left-6 top-14 h-[calc(100%-2rem)] w-px bg-line lg:left-1/2 lg:top-7 lg:h-px lg:w-full"
+                      className="absolute left-6 top-14 h-[calc(100%-2rem)] w-px bg-line lg:hidden xl:left-1/2 xl:top-7 xl:block xl:h-px xl:w-full"
                     />
                   ) : null}
-                  <div className="relative z-10 flex size-12 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-primary shadow-card">
+                  <div                   className="relative z-10 flex size-12 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-primary shadow-card lg:mx-auto">
                     <Icon aria-hidden className="size-5" />
                   </div>
-                  <div className="min-w-0 lg:mt-4 lg:px-2">
+                  <div className="min-w-0 lg:mt-4 lg:px-2 lg:text-center">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">
                       Step {index + 1}
                     </p>

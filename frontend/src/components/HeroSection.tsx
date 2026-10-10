@@ -28,20 +28,21 @@ export function HeroSection() {
         className="absolute inset-0 bg-gradient-to-r from-primary-dark via-primary-dark/85 to-transparent"
       />
 
-      <div className="relative mx-auto flex min-h-[600px] max-w-7xl flex-col justify-center px-4 py-16 sm:px-6 lg:min-h-[620px] lg:px-8">
-        <div className="max-w-2xl">
+      <div className="relative mx-auto flex min-h-[600px] max-w-7xl flex-col justify-center px-4 py-16 sm:px-6 lg:min-h-[640px] lg:px-8">
+        <div className="max-w-[42rem]">
           <p className="inline-flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.22em] text-white/85">
             <span aria-hidden className="h-0.5 w-8 bg-accent" />
-            From Yarn to the World
+            Textile Manufacturing Management System
           </p>
 
-          <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Textile Manufacturing <span className="text-accent">System</span>
+          <h1 className="mt-5 font-display text-[clamp(2.5rem,5.4vw,4rem)] font-extrabold leading-[1.08] tracking-tight text-white">
+            Your Entire Textile Factory.{' '}
+            <span className="text-accent">Connected in One System.</span>
           </h1>
 
           <p className="mt-5 max-w-xl text-base leading-relaxed text-white/85 sm:text-lg">
-            Digitally manage your entire textile production from raw material to
-            delivery.
+            Coordinate raw materials, production, quality, orders, and dispatch
+            through one connected factory management system.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
@@ -54,7 +55,7 @@ export function HeroSection() {
             </a>
           </div>
 
-          <ul className="mt-12 grid max-w-2xl gap-6 sm:grid-cols-3">
+          <ul className="mt-10 grid max-w-2xl gap-5 sm:grid-cols-3">
             {DEMO_HERO_BENEFITS.map((benefit) => {
               const Icon = HERO_ICONS[benefit.icon];
               return (

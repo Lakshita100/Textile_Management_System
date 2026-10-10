@@ -25,10 +25,10 @@ const INDICATOR_ICONS = {
 } as const;
 
 const ACCENT_CLASSES = {
-  package: 'bg-accent/10 text-accent',
+  package: 'bg-primary/10 text-primary',
   clipboard: 'bg-primary/10 text-primary',
-  cog: 'bg-purple/10 text-purple',
-  waves: 'bg-warning/10 text-warning',
+  cog: 'bg-primary/10 text-primary',
+  waves: 'bg-primary/10 text-primary',
 } as const;
 
 const TONE_CLASSES: Record<StatTone, string> = {
