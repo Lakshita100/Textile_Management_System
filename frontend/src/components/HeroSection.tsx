@@ -45,7 +45,7 @@ export function HeroSection() {
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-            <Link to="/signin" className={buttonClass('primary', 'lg')}>
+            <Link to="/signup" className={buttonClass('primary', 'lg')}>
               Get Started
               <ArrowRight aria-hidden className="size-4" />
             </Link>

@@ -6,13 +6,14 @@ import { EMPLOYEES } from '../../services/employeeService'
 const qualityNav = [
   { to: '/quality', label: 'Quality Dashboard', end: true },
   { to: '/quality/inspections', label: 'All Inspections', end: true },
+  { to: '/quality/packing', label: 'Packing', end: true },
+  { to: '/quality/dispatch', label: 'Dispatch', end: true },
 ]
 
 const otherModules: { label: string; to?: string }[] = [
   { label: 'Production & Machines', to: '/app' },
   { label: 'Inventory & Suppliers' },
   { label: 'Orders' },
-  { label: 'Warehouse & Dispatch' },
   { label: 'Employees & Accounts' },
 ]
 

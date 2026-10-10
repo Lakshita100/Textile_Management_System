@@ -45,7 +45,7 @@ A centralized web application for textile factories that connects raw material a
 | Machine / production / recommendation / analytics services & routers | Implemented and verified |
 | React application (Dashboard, Machines, Jobs, Recommendations, Analytics) | Implemented and verified |
 | Seed data (labeled fixtures), tests | 29 backend tests + 3 frontend tests passing |
-| Modules 01/04 (Maahi/Ram), Auth/RBAC | Not implemented — labeled FIXTURE adapters in use |
+| Maahi inventory API, Ram order API, Auth/RBAC | Not implemented — a browser-local Ram buyer/admin workflow prototype is available; manual material checks are explicitly labelled demo data |
 | Module 03 Quality (Anand) frontend | Merged from branch `anand` — dashboard, inspections, modal form at `/quality` (in-memory demo data; API wiring pending) |
 
 The approved global theme and design tokens are version-controlled at [`frontend/src/styles/theme.css`](frontend/src/styles/theme.css) and [`frontend/src/styles/global.css`](frontend/src/styles/global.css); never invent a new brand palette.
@@ -62,6 +62,10 @@ The approved global theme and design tokens are version-controlled at [`frontend
 | 06 — Employee, Attendance and Accounts | TBD |
 
 Lakshita also owns the **platform foundation** required for Feature 02 (FastAPI app shell, database session/migration tooling, health endpoints, and the frontend application shell where missing) — scoped to what Feature 02 needs, confirmed 2026-10-10.
+
+### Ram order workflow prototype
+
+The frontend includes a buyer order request, order tracking, and Ram’s incoming-order review/decision flow, backed by browser local storage for demonstration only. Decisions and buyer-visible messages remain associated with the same Order ID. Material availability is not connected to Maahi: the review page displays an integration-pending state until Ram explicitly enters a clearly labelled demo check. The approved orders appear in the Lakshita production-planning integration boundary; no production API is called. This prototype is not production persistence or authentication.
 
 ## Repository Structure
 
