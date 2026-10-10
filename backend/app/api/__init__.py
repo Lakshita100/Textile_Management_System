@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 
-from app.api import auth, health, machines, production, quality, recommendations, scheduling
+from app.api import attendance, auth, health, machines, production, quality, recommendations, scheduling
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
+api_router.include_router(attendance.router)
 api_router.include_router(health.router)
 api_router.include_router(machines.router)
 api_router.include_router(production.router)

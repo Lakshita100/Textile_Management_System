@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.auth import require_permission
 from app.models.quality import QualityInspection
 from app.schemas.common import Page
 from app.schemas.quality import (
@@ -24,7 +25,7 @@ from app.schemas.quality import (
 from app.services import quality as quality_service
 from app.services.quality import QualityRuleError
 
-router = APIRouter(prefix="/quality", tags=["quality"])
+router = APIRouter(prefix="/quality", tags=["quality"], dependencies=[Depends(require_permission("quality"))])
 
 _ERR_STATUS = {
     "JOB_NOT_FOUND": 404,

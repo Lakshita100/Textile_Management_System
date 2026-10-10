@@ -36,10 +36,20 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    let token: string | null = null;
+    try {
+      token = window.localStorage.getItem('everest-auth-token');
+    } catch {
+      /* Storage can be unavailable; anonymous requests still work. */
+    }
     const init: RequestInit = {
       ...rest,
       signal: controller.signal,
-      headers: { Accept: 'application/json', ...headers },
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
     };
     if (formData) {
       init.body = formData;
@@ -116,10 +126,20 @@ export const http = {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      let token: string | null = null;
+      try {
+        token = window.localStorage.getItem('everest-auth-token');
+      } catch {
+        /* Anonymous binary downloads remain possible if storage is unavailable. */
+      }
       const response = await fetch(`${BASE}/api/v1${path}`, {
         ...rest,
         signal: controller.signal,
-        headers: { Accept: 'text/csv,*/*', ...headers },
+        headers: {
+          Accept: 'text/csv,*/*',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...headers,
+        },
       });
       if (!response.ok) {
         let detail = response.statusText || `HTTP ${response.status}`;

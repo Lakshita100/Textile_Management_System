@@ -10,14 +10,15 @@ Security notes:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import secrets
 
 import jwt
 from passlib.hash import pbkdf2_sha256
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models.auth import User, UserRole
-from app.schemas.auth import RegisterIn
+from app.models.auth import FEATURE_PERMISSIONS, User, UserRole
+from app.schemas.auth import EmployeeCreateIn, RegisterIn
 
 # ~120k iterations: interactive-login cost without slowing the test suite.
 PBKDF2_ROUNDS = 120_000
@@ -63,7 +64,7 @@ def decode_access_token(token: str) -> dict | None:
 
 
 def register_user(db: Session, payload: RegisterIn) -> User:
-    """Create a buyer/staff account. Duplicate email -> EMAIL_EXISTS (409)."""
+    """Create a public buyer account. Staff/admin provisioning is admin-only."""
     existing = db.query(User).filter(User.email == payload.email).first()
     if existing is not None:
         raise AuthError("EMAIL_EXISTS", "An account already exists for this email address.")
@@ -72,10 +73,11 @@ def register_user(db: Session, payload: RegisterIn) -> User:
         email=payload.email,
         password_hash=hash_password(payload.password),
         full_name=payload.full_name.strip(),
-        role=payload.role,
+        role=UserRole.BUYER.value,
         company=payload.company.strip() if payload.company else None,
         phone=payload.phone.strip() if payload.phone else None,
         is_active=True,
+        permissions=[],
     )
     db.add(user)
     db.commit()
@@ -83,14 +85,49 @@ def register_user(db: Session, payload: RegisterIn) -> User:
     return user
 
 
-def authenticate(db: Session, email: str, password: str) -> User:
+def authenticate(db: Session, identifier: str, password: str) -> User:
     """Verify credentials. Wrong email and wrong password share one error."""
-    user = db.query(User).filter(User.email == email).first()
+    normalized = identifier.strip().lower()
+    user = db.query(User).filter(
+        (User.email == normalized) | (User.login_id == identifier.strip().upper())
+    ).first()
     if user is None or not verify_password(password, user.password_hash):
         raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect email or password.")
+    if user.role == UserRole.BUYER.value and "@" not in identifier:
+        raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect email or password.")
+    if user.role != UserRole.BUYER.value and (not user.login_id or identifier.strip().upper() != user.login_id):
+        raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect employee or administrator ID or password.")
     if not user.is_active:
         raise AuthError("ACCOUNT_DISABLED", "This account has been disabled.")
     return user
+
+
+def provision_employee(db: Session, payload: EmployeeCreateIn) -> tuple[User, str]:
+    """Create staff with a unique employee ID and one-time password."""
+    email = payload.email
+    if email and db.query(User).filter(User.email == email).first() is not None:
+        raise AuthError("EMAIL_EXISTS", "An account already exists for this email address.")
+    invalid = sorted(set(payload.permissions) - set(FEATURE_PERMISSIONS))
+    if invalid:
+        raise AuthError("INVALID_PERMISSION", f"Unknown feature permission: {', '.join(invalid)}")
+
+    temporary_password = secrets.token_urlsafe(18)
+    user = User(
+        email=email,
+        password_hash=hash_password(temporary_password),
+        full_name=payload.full_name.strip(),
+        role=UserRole.STAFF.value,
+        phone=payload.phone.strip() if payload.phone else None,
+        is_active=True,
+        permissions=sorted(set(payload.permissions)),
+        must_change_password=True,
+    )
+    db.add(user)
+    db.flush()
+    user.login_id = f"EMP-{user.id:06d}"
+    db.commit()
+    db.refresh(user)
+    return user, temporary_password
 
 
 def get_user_by_id(db: Session, user_id: int) -> User | None:
@@ -132,8 +169,14 @@ def seed_user(
         company=company,
         phone=phone,
         is_active=True,
+        permissions=[],
     )
     db.add(user)
+    db.flush()
+    if role_value == UserRole.ADMIN.value:
+        user.login_id = f"ADM-{user.id:06d}"
+    elif role_value == UserRole.STAFF.value:
+        user.login_id = f"EMP-{user.id:06d}"
     db.commit()
     db.refresh(user)
     return user

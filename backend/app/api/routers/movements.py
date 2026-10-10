@@ -8,11 +8,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.api.auth import require_permission
 from app.schemas import MovementCreate, MovementListOut, MovementOut
 from app.services import movements
 from app.services.common import transaction
 
-router = APIRouter(prefix="/movements", tags=["movements"])
+router = APIRouter(prefix="/movements", tags=["movements"], dependencies=[Depends(require_permission("materials"))])
 
 
 @router.get("", response_model=MovementListOut, summary="List stock movements (newest first)")

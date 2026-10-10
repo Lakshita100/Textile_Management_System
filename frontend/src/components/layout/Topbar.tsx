@@ -1,5 +1,6 @@
-import { Menu, Package } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { LogOut, Menu, Package } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../store/AuthProvider';
 
 interface TopbarProps {
   title: string;
@@ -9,6 +10,13 @@ interface TopbarProps {
 }
 
 export default function Topbar({ title, module, showHomeCrumb, onMenuClick }: TopbarProps) {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  async function logout() {
+    await signOut();
+    navigate('/signin', { replace: true });
+  }
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-[var(--color-border)] bg-[var(--color-background)] px-4 sm:px-6">
       <button
@@ -43,6 +51,14 @@ export default function Topbar({ title, module, showHomeCrumb, onMenuClick }: To
           Module · {module}
         </span>
       ) : null}
+      <div className="hidden text-right sm:block">
+        <p className="max-w-44 truncate text-xs font-medium text-[var(--color-heading)]">{user?.full_name}</p>
+        <p className="text-[10px] uppercase tracking-wide text-[var(--color-text-muted)]">{user?.login_id ?? user?.email}</p>
+      </div>
+      <button type="button" onClick={() => void logout()} className="inline-flex h-9 items-center gap-2 rounded-[var(--radius-button)] border border-[var(--color-border)] px-3 text-xs font-medium text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]" aria-label="Sign out">
+        <LogOut size={15} aria-hidden />
+        <span className="hidden md:inline">Sign out</span>
+      </button>
     </header>
   );
 }

@@ -3,14 +3,16 @@ import type { ReactNode } from 'react';
 import type { AuthRole, AuthUser } from '../services/authService';
 import {
   fetchCurrentUser,
+  changePassword as changePasswordRequest,
   getStoredToken,
   registerAccount,
   signIn as signInRequest,
+  signInWithGoogle as signInWithGoogleRequest,
   signOut as signOutRequest,
   storeToken,
 } from '../services/authService';
 import type { RegisterInput } from '../services/authService';
-import { setCurrentSession } from '../services/orderService';
+import { setCurrentSession, syncAuthenticatedBuyer } from '../services/orderService';
 
 /**
  * The buyer/admin portals still read their workspace session from
@@ -25,14 +27,14 @@ function syncPortalSession(user: AuthUser | null): void {
   if (user.role !== 'buyer' && user.role !== 'admin') {
     return;
   }
-  // Reuse the seeded demo buyer's data key when the email matches.
-  const legacyBuyerId =
-    user.email.toLowerCase() === 'buyer@everestmills.com' ? 'buyer-demo' : `user-${user.id}`;
+  if (user.role === 'buyer') syncAuthenticatedBuyer(user);
+  const email = user.email ?? '';
+  const accountDataId = `user-${user.id}`;
   setCurrentSession({
-    userId: legacyBuyerId,
+    userId: accountDataId,
     role: user.role,
     name: user.full_name,
-    email: user.email,
+    email,
     companyName: user.company ?? undefined,
   });
 }
@@ -41,10 +43,13 @@ export interface AuthContextValue {
   user: AuthUser | null;
   /** True while the stored token is being validated against /auth/me. */
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<AuthUser>;
+  signIn: (identifier: string, password: string) => Promise<AuthUser>;
+  signInWithGoogle: (idToken: string) => Promise<AuthUser>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<AuthUser>;
   register: (input: RegisterInput) => Promise<AuthUser>;
   signOut: () => Promise<void>;
   hasRole: (...roles: AuthRole[]) => boolean;
+  hasPermission: (permission: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -83,12 +88,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = useCallback(async (email: string, password: string) => {
-    const session = await signInRequest(email, password);
+  const signIn = useCallback(async (identifier: string, password: string) => {
+    const session = await signInRequest(identifier, password);
     storeToken(session.token);
     syncPortalSession(session.user);
     setUser(session.user);
     return session.user;
+  }, []);
+
+  const signInWithGoogle = useCallback(async (idToken: string) => {
+    const session = await signInWithGoogleRequest(idToken);
+    storeToken(session.token);
+    syncPortalSession(session.user);
+    setUser(session.user);
+    return session.user;
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const updated = await changePasswordRequest(currentPassword, newPassword);
+    syncPortalSession(updated);
+    setUser(updated);
+    return updated;
   }, []);
 
   const register = useCallback(async (input: RegisterInput) => {
@@ -109,10 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (...roles: AuthRole[]) => (user ? roles.includes(user.role) : false),
     [user],
   );
+  const hasPermission = useCallback(
+    (permission: string) => Boolean(user && (user.role === 'admin' || user.permissions.includes(permission))),
+    [user],
+  );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, signIn, register, signOut, hasRole }),
-    [user, loading, signIn, register, signOut, hasRole],
+    () => ({ user, loading, signIn, signInWithGoogle, changePassword, register, signOut, hasRole, hasPermission }),
+    [user, loading, signIn, signInWithGoogle, changePassword, register, signOut, hasRole, hasPermission],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
