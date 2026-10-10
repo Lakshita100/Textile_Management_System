@@ -2,11 +2,11 @@ import { NavLink, Outlet } from 'react-router-dom';
 import { BarChart3, ClipboardCheck, Factory, LayoutDashboard, ListChecks, Sparkles } from 'lucide-react';
 
 const nav = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/machines', label: 'Machines', icon: Factory, end: false },
-  { to: '/jobs', label: 'Production Board', icon: ListChecks, end: false },
-  { to: '/recommend', label: 'Recommendations', icon: Sparkles, end: false },
-  { to: '/analytics', label: 'Analytics', icon: BarChart3, end: false },
+  { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/app/machines', label: 'Machines', icon: Factory, end: false },
+  { to: '/app/jobs', label: 'Production Board', icon: ListChecks, end: false },
+  { to: '/app/recommend', label: 'Recommendations', icon: Sparkles, end: false },
+  { to: '/app/analytics', label: 'Analytics', icon: BarChart3, end: false },
   { to: '/quality', label: 'Quality', icon: ClipboardCheck, end: false },
 ];
 

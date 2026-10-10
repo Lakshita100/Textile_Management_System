@@ -1,2 +1,85 @@
 @import "tailwindcss";
 @import "./styles/global.css";
+
+/*
+  Landing-page design tokens.
+
+  Shared brand tokens (primary / accent / surface) are aligned to the team's
+  approved palette in `styles/theme.css` so the existing factory app keeps its
+  exact look. The additional tokens below (ink, muted, line, canvas, semantic
+  colours, elevation, display font) back the marketing landing page only.
+*/
+@theme {
+  --font-sans: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Manrope Variable", Manrope, ui-sans-serif, system-ui, sans-serif;
+
+  /* Shared brand (aligned with styles/theme.css) */
+  --color-primary: #3f85c4;
+  --color-accent: #76b82a;
+  --color-surface: #ffffff;
+  --color-success: #16a34a;
+
+  /* Landing-only palette */
+  --color-primary-dark: #073b63;
+  --color-canvas: #f4f7fa;
+  --color-ink: #172b45;
+  --color-muted: #52657c;
+  --color-line: #e1e8f0;
+  --color-warning: #f59e0b;
+  --color-error: #dc2626;
+  --color-purple: #7c3aed;
+
+  /* Elevation */
+  --shadow-card: 0 1px 2px rgb(23 43 69 / 6%);
+  --shadow-elevated: 0 12px 32px rgb(7 59 99 / 12%);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    font-family: var(--font-sans);
+  }
+}
+
+/* Gentle section reveal (disabled automatically under reduced motion). */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 560ms ease,
+    transform 560ms ease;
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Subtle woven-textile texture for the final CTA band. */
+.textile-pattern {
+  background-image:
+    repeating-linear-gradient(0deg, rgb(255 255 255 / 4%) 0 1px, transparent 1px 15px),
+    repeating-linear-gradient(90deg, rgb(255 255 255 / 4%) 0 1px, transparent 1px 15px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}
