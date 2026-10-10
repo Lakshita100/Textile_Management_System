@@ -1,23 +1,30 @@
-"""FastAPI application entry point — Textile Manufacturing Intelligence System (Feature 02)."""
+"""FastAPI application factory."""
 
 from __future__ import annotations
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
-from app.api import api_router
+from app.api.routers import alerts, imports, inventory, movements, purchases, suppliers
 from app.config import settings
+from app.database import check_db_connection
+from app.utils.errors import register_exception_handlers
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title=settings.APP_NAME,
-        version="0.2.0",
-        description="Production & Machine Tracking (Feature 02) — machines, production jobs, recommendations, analytics.",
-        openapi_url=f"{settings.API_PREFIX}/openapi.json",
-        docs_url=f"{settings.API_PREFIX}/docs",
+        version="1.0.0",
+        description=(
+            "REST API for the Smart Yarn Inventory module: yarn inventory, stock "
+            "movements, low-stock alerts, supplier management and purchase request "
+            "drafts. All numbers are computed from the database."
+        ),
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
     )
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -26,15 +33,23 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    @app.exception_handler(Exception)
-    async def unhandled_exception_handler(request: Request, exc: Exception):
-        return JSONResponse(status_code=500, content={"detail": "Internal server error", "code": "INTERNAL_ERROR"})
+    register_exception_handlers(app)
 
-    app.include_router(api_router, prefix=settings.API_PREFIX)
+    @app.get("/health", tags=["system"])
+    def health() -> dict:
+        """Liveness + database connectivity check."""
+        return {
+            "status": "ok",
+            "database": "up" if check_db_connection() else "down",
+            "environment": settings.ENVIRONMENT,
+        }
 
-    @app.get("/", include_in_schema=False)
-    def root():
-        return {"app": settings.APP_NAME, "api": settings.API_PREFIX, "docs": f"{settings.API_PREFIX}/docs"}
+    app.include_router(inventory.router, prefix=settings.API_PREFIX)
+    app.include_router(suppliers.router, prefix=settings.API_PREFIX)
+    app.include_router(movements.router, prefix=settings.API_PREFIX)
+    app.include_router(alerts.router, prefix=settings.API_PREFIX)
+    app.include_router(purchases.router, prefix=settings.API_PREFIX)
+    app.include_router(imports.router, prefix=settings.API_PREFIX)
 
     return app
 
