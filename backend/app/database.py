@@ -1,9 +1,11 @@
-"""Database session and engine configuration."""
+"""Database session and engine configuration (sync-only)."""
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 from sqlalchemy import create_engine, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import settings
@@ -12,41 +14,18 @@ from app.config import settings
 class Base(DeclarativeBase):
     """Base class for SQLAlchemy models."""
 
-    pass
 
-
-# Synchronous engine for migrations and direct operations
-engine = create_engine(
+engine: Engine = create_engine(
     settings.DATABASE_URL,
-    echo=settings.DEBUG,
+    echo=settings.SQL_ECHO,
     future=True,
 )
 
-# Async engine for async endpoints
-async_engine = create_async_engine(
-    settings.DATABASE_URL.replace("postgresql+psycopg2", "postgresql+asyncio"),
-    echo=settings.DEBUG,
-    future=True,
-)
-
-# Session factories
-SessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=engine,
-    class_=Session,
-)
-
-AsyncSessionLocal = sessionmaker(
-    autocommit=False,
-    autoflush=False,
-    bind=async_engine,
-    class_=AsyncSession,
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=Session)
 
 
-def get_db() -> Session:
-    """Dependency for getting a synchronous database session."""
+def get_db() -> Generator[Session, None, None]:
+    """FastAPI dependency providing a synchronous database session."""
     db = SessionLocal()
     try:
         yield db
@@ -54,14 +33,8 @@ def get_db() -> Session:
         db.close()
 
 
-async def get_async_db() -> AsyncSession:
-    """Dependency for getting an asynchronous database session."""
-    async with AsyncSessionLocal() as session:
-        yield session
-
-
 def check_db_connection() -> bool:
-    """Verify database connectivity."""
+    """Verify database connectivity with a trivial query."""
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))

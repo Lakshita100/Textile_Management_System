@@ -1,7 +1,7 @@
 # Project Status — Source of Truth (shared)
 
-**Last repository audit:** 2026-10-10 (branch `main`, commit `d9cd758`, clean working tree before Stage 0 documentation changes).
-**Overall implementation status:** **SCAFFOLD ONLY — no application functionality implemented or verified.**
+**Last repository audit:** 2026-10-10 (branch `main`, commit `8e70d98` at start of Feature 02 implementation sprint; this changeset contains the Feature 02 phases below).
+**Overall implementation status:** **Feature 02 (Production & Machine Tracking) implemented and verified — platform foundation, backend, frontend, tests. Team modules 01/03/04 not yet in this repository.**
 
 This file records only what has been inspected in the repository with evidence. Plans, mockups and generated-but-untested code are never counted as implemented.
 
@@ -14,47 +14,48 @@ This file records only what has been inspected in the repository with evidence. 
 - **Blocked** — cannot proceed due to a named dependency or missing decision.
 - **Not audited** — no reliable repository evidence yet.
 
-## Audit evidence (2026-10-10)
+## Audit evidence (2026-10-10, post Feature 02 sprint)
 
-- Git: single commit `d9cd758` on `main`; `git status --short` clean before this documentation session.
-- Backend files: only `backend/app/config.py` (pydantic-settings) and `backend/app/database.py` (sync + async engine; async engine unusable — `asyncpg` not installed). No `app/main.py` (`python -c "import app.main"` → `ModuleNotFoundError`). No models, schemas, routers, CRUD, services, tests or Alembic `env.py` (directories exist but are empty except `.gitkeep`).
-- Pytest baseline: `python -m pytest --collect-only -q` → **no tests collected**.
-- Frontend: **no files** — no `package.json`, no Vite config, no source code. Only `.gitkeep` placeholders.
-- PostgreSQL 17.9 running on `localhost:5432`; database `textile_manufacturing` exists (UTF8, owner `postgres`) with **0 tables**.
-- Python 3.13.5 with project pins installed globally except `qrcode` (missing) and `factory_boy` (missing; not required). Node v22.17.0, npm 11.16.0, Git 2.50.1. `psql` available at `C:\Program Files\PostgreSQL\17\bin\`.
-- Secrets: `backend/.env` exists locally, contains placeholders identical to `.env.example`, is git-ignored, and was not committed.
+- Git: `main` at `8e70d98` before this changeset; Feature 02 code committed in this change set; private `ai/` remains git-ignored and local-only.
+- Backend: FastAPI app (`app/main.py`) with `/api/v1` prefix, CORS for the local frontend, global error handling; health endpoints `/api/v1/health` and `/api/v1/health/db` return `ok` / `{"database": "postgresql", "connected": true}`.
+- Database: PostgreSQL 17.9 `textile_manufacturing` migrated to head (`alembic upgrade head` → `909cc08f3f36`); tables `machines`, `machine_status_events`, `production_jobs`, `production_job_status_events`, `machine_downtime_events`, `machine_recommendations`. Tests run against SQLite in-memory.
+- Backend tests: `python -m pytest -q` → **29 passed** (health, machines, production, recommendations).
+- Frontend: Vite + React + TS + Tailwind application with pages Dashboard, Machines, Machine detail, Production board, Recommendations, Analytics; imports the approved theme. `npm test` (vitest) → **3 passed**; `npm run build` (tsc + vite) → **success**; dev server serves HTTP 200 on `http://localhost:5173`.
+- Live end-to-end (uvicorn on `:8000`): machine create/status/history, job lifecycle, quantity progress, recommendation with eligibility exclusions + score breakdown + supervisor approval → job creation, insufficient-material rejection, analytics rows with honest `null` metrics where no data exists.
+- Dependency modules (Maahi/Anand/Ram) are still absent; Feature 02 consumes clearly-labeled **FIXTURE adapters** (`app/adapters/fixtures.py`) — never presented as live integrations.
+- Demo seed data (`backend/scripts/seed_demo.py`) is labeled DEVELOPMENT FIXTURES.
 
 ## Status matrix
 
 | Area | Status | Evidence / next action |
 |---|---|---|
-| Repository / monorepo structure | Scaffold only | Empty dirs + 2 backend config files; see audit evidence |
+| Repository / monorepo structure | Implemented | Backend, frontend, docs, tests in place |
 | Shared documentation (`docs/`) | Created (Stage 0) | Architecture, plan, status, tracker, prerequisites, data sources, API contracts |
-| Approved theme / global CSS | Created (Stage 0) | `frontend/src/styles/theme.css`, `global.css` — not yet imported by any app (no frontend app) |
-| Backend app shell (FastAPI `main.py`, CORS, `/api/v1`) | Not implemented | Owner confirmed: **Lakshita** (platform foundation for Feature 02) — build authorized in Phase 2 |
-| Database models (14-table shared schema) | Not implemented | Database exists but is empty; no Alembic setup |
-| Alembic migrations | Not implemented | No `alembic.ini` / `env.py` |
-| Feature 02 — Machine Overview Dashboard | Not implemented | Depends on machine models + backend foundation |
-| Feature 02 — Current Machine Assignments | Not implemented | Depends on `production_jobs` + Ram's `orders` |
-| Feature 02 — Production Quantity & Progress Tracking | Not implemented | Depends on production job foundation |
-| Feature 02 — Machine Recommendation Engine | Not implemented | Depends on Maahi (materials), Ram (orders), Anand (quality) contracts |
-| Feature 02 — Performance & Quality-History Analytics | Not implemented | Depends on Anand's `quality_inspections` history |
-| Module 01 Raw Materials (Maahi) | Not implemented | Not in this repository yet |
-| Module 03 Quality (Anand) | Not implemented | Not in this repository yet |
-| Module 04 Orders (Ram) | Not implemented | Not in this repository yet |
+| Approved theme / global CSS | Implemented and verified | `frontend/src/styles/theme.css` + `global.css`, imported by the running frontend; only approved tokens used |
+| Backend app shell (FastAPI `main.py`, CORS, `/api/v1`) | Implemented and verified | Health endpoints verified live; 500-handling verified |
+| Database models (Feature 02 schema) | Implemented and verified | 6 tables created via migration `909cc08f3f36` on PostgreSQL; SQLite for tests |
+| Alembic migrations | Implemented and verified | `alembic upgrade head` applied; sync-only engine (async path removed — `asyncpg` unavailable) |
+| Feature 02 — Machine Overview Dashboard | Implemented and verified | KPI cards, searchable/filterable table, detail + status history screens wired to live API |
+| Feature 02 — Current Machine Assignments | Implemented and verified (FIXTURE order refs) | Assignment model, conflict prevention, transitions validated by 29-test suite; Ram's `orders` not yet real |
+| Feature 02 — Production Quantity & Progress Tracking | Implemented and verified | Lifecycle transitions, overproduction/negative-quantity rejection, downtime records, dashboard KPIs |
+| Feature 02 — Machine Recommendation Engine | Implemented and verified | Rule-based scoring (0.40/0.35/0.25), eligibility gates before scoring, explanations, warnings, approval revalidation; live e2e verified |
+| Feature 02 — Performance & Quality-History Analytics | Implemented and verified (defect metric pending Anand) | `/production/analytics` returns per-machine output/efficiency/utilization/downtime; defect rate shown only from real quality data (none yet) |
+| Module 01 Raw Materials (Maahi) | Not implemented | Material gate served by labeled FIXTURE adapter |
+| Module 03 Quality (Anand) | Not implemented | Quality score/defect rate return neutral + warnings (never silent perfect) |
+| Module 04 Orders (Ram) | Not implemented | Order refs served by labeled FIXTURE adapter |
 | Modules 05/06 (Warehouse, Employees/Accounts) | Not implemented | Owners TBD |
-| Authentication / RBAC | Not implemented | Config placeholders only (`SECRET_KEY`, JWT settings in `config.py`) |
-| Backend tests | Not implemented | pytest collects 0 tests |
-| Frontend tests / build | Not implemented | No frontend project exists |
+| Authentication / RBAC | Not implemented | Config placeholders removed pending design; supervisor approval currently records approver name only |
+| Backend tests | Implemented and verified | `python -m pytest -q` → 29 passed |
+| Frontend tests / build | Implemented and verified | `npm test` → 3 passed; `npm run build` → success |
 | CI / deployment | Not implemented | Out of scope until MVP verified |
 
 ## Known risks
 
-1. **Feature 02 depends on three modules (01/03/04) that do not exist in this repository.** Contracts must be obtained from Maahi, Anand and Ram; until then they remain PROPOSED/BLOCKED with safe adapter boundaries.
-2. **Platform foundation ownership is now confirmed: Lakshita** owns the foundation required for Feature 02 (FastAPI app shell, models base, Alembic, frontend shell). Build is authorized in Phase 2; the foundation itself is still not implemented.
-3. `app/database.py` contains a broken async engine path (no `asyncpg`); refactor decision recorded in the private decisions log.
-4. No authentication exists; supervisor approval in the recommendation flow needs at least a role foundation.
-5. Theme CSS exists but no frontend app imports it yet.
+1. **Feature 02 still depends on three modules (01/03/04) that do not exist in this repository.** FIXTURE adapters are labeled and swappable; contracts must be confirmed with Maahi, Anand and Ram before real integration (Phase 1 items remain open).
+2. **Auth/RBAC is not implemented.** Supervisor approval persists the approver name but there is no identity/role enforcement yet — required before real deployment.
+3. Analytics defect-rate and recommendation quality-score depend on Anand's `quality_inspections`; until then they are neutral fallbacks with visible warnings.
+4. Demo/seed rows (DEVELOPMENT FIXTURES) and earlier manual test rows live in the local PostgreSQL database; a fresh clone must run `alembic upgrade head` (and optionally the seed script).
+5. Optional ML (Stage 7 / `dataset/ai4i2020.csv`) remains unapproved and unused by any running code.
 
 ## Rules for updating this document
 
