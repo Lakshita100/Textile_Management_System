@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { postBackendAttendancePunch } from '../../services/api';
 
 export const WorkerContext = createContext();
 
@@ -143,6 +144,14 @@ export const WorkerProvider = ({ children }) => {
         rawInTime: now.toISOString(),
       };
       setActiveShift(newShift);
+
+      postBackendAttendancePunch({
+        worker_id: worker?.id || 'EMP-000021',
+        worker_name: worker?.name || 'Ramesh Kumar',
+        action: 'PUNCH_IN',
+        timestamp: now.toISOString(),
+      });
+
       return { action: 'IN', time: timeFormatted, date: dateFormatted };
     } else {
       // PUNCH OUT
@@ -165,6 +174,15 @@ export const WorkerProvider = ({ children }) => {
 
       setAttendanceLogs([newRecord, ...attendanceLogs]);
       setActiveShift(null);
+
+      postBackendAttendancePunch({
+        worker_id: worker?.id || 'EMP-000021',
+        worker_name: worker?.name || 'Ramesh Kumar',
+        action: 'PUNCH_OUT',
+        timestamp: now.toISOString(),
+        hours_worked: hoursWorked,
+      });
+
       return { action: 'OUT', time: timeFormatted, date: dateFormatted, hoursWorked, earned };
     }
   };

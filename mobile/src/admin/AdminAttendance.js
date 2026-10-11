@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,15 +6,32 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, Feather } from '@expo/vector-icons';
 import { AppContext } from '../context/AppContext';
 import { COLORS } from '../styles/theme';
 
 export default function AdminAttendance() {
-  const { employeeAttendanceLogs, employees } = useContext(AppContext);
+  const { employeeAttendanceLogs, employees, syncBackendAttendance } = useContext(AppContext);
   const [searchTerm, setSearchTerm] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncBackendAttendance();
+    setRefreshing(false);
+  }, [syncBackendAttendance]);
+
+  // Initial sync & auto poll every 5s so attendance records stay in sync
+  useEffect(() => {
+    syncBackendAttendance();
+    const interval = setInterval(() => {
+      syncBackendAttendance();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [syncBackendAttendance]);
 
   // Master Attendance Stream (combining initial roster records + real-time scanned logs)
   const masterAttendanceList = [...employeeAttendanceLogs];
@@ -47,8 +64,24 @@ export default function AdminAttendance() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>All Employee Attendance</Text>
-        <Text style={styles.headerSub}>Master attendance records & shift log directory</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Text style={styles.headerTitle}>All Employee Attendance</Text>
+            <Text style={styles.headerSub}>Master attendance records & shift log directory</Text>
+          </View>
+          <TouchableOpacity
+            style={{
+              padding: 8,
+              borderRadius: 8,
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
+              borderColor: COLORS.line,
+            }}
+            onPress={onRefresh}
+          >
+            <Feather name="refresh-cw" size={16} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
 
         {/* Search Bar */}
         <View style={styles.searchBar}>
@@ -63,7 +96,17 @@ export default function AdminAttendance() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         <View style={styles.summaryRow}>
           <View style={styles.summaryCard}>
             <Text style={styles.summaryVal}>{masterAttendanceList.length}</Text>

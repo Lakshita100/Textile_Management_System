@@ -4,6 +4,8 @@ import {
   getBackendTextiles,
   createBackendRequirement,
   postBackendAttendancePunch,
+  getBackendLiveAttendanceStatus,
+  getBackendAttendanceLogs,
 } from '../services/api';
 
 export const AppContext = createContext();
@@ -141,7 +143,15 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     loadState();
     syncBackendTextiles();
+    syncBackendAttendance();
   }, []);
+
+  // Sync attendance when user logs in or switches role
+  useEffect(() => {
+    if (currentUser) {
+      syncBackendAttendance();
+    }
+  }, [currentUser]);
 
   // Safe Save state on change
   useEffect(() => {
@@ -154,6 +164,37 @@ export const AppProvider = ({ children }) => {
     const remoteData = await getBackendTextiles();
     if (remoteData && Array.isArray(remoteData) && remoteData.length > 0) {
       setTextiles(remoteData);
+    }
+  };
+
+  const syncBackendAttendance = async () => {
+    try {
+      const data = await getBackendLiveAttendanceStatus(currentUser?.token);
+      if (data && data.success) {
+        if (Array.isArray(data.employees) && data.employees.length > 0) {
+          setEmployees(data.employees);
+        }
+        if (Array.isArray(data.records)) {
+          setEmployeeAttendanceLogs(data.records);
+        }
+        // If logged in as employee, sync active shift state with backend
+        if (userRole === 'employee' && currentUser?.id) {
+          const myEmp = data.employees?.find(
+            (e) => e.id === currentUser.id || e.name === currentUser.name
+          );
+          if (myEmp && myEmp.status === 'ON DUTY' && !activeShift) {
+            setActiveShift({
+              date: myEmp.lastCheckIn.split(',')[0],
+              inTime: myEmp.lastCheckIn.split(',')[1]?.trim() || '09:00 AM',
+              rawInTime: new Date().toISOString(),
+            });
+          } else if (myEmp && myEmp.status === 'OFF DUTY' && activeShift) {
+            setActiveShift(null);
+          }
+        }
+      }
+    } catch (e) {
+      // Silent error fallback
     }
   };
 
@@ -205,16 +246,28 @@ export const AppProvider = ({ children }) => {
   };
 
   // Employee Punch IN / OUT when scanning Station QR (Syncs with Backend API)
-  const punchAttendance = () => {
+  const punchAttendance = async () => {
     const now = new Date();
     const timeFormatted = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
     const dateFormatted = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 
     const empName = currentUser?.name || 'Ramesh Kumar';
-    const empId = currentUser?.id || 'EMP-101';
+    const empId = currentUser?.id || 'EMP-000021';
     const hourlyRate = currentUser?.hourlyRate || 150;
+    const isPunchIn = !activeShift;
 
-    if (!activeShift) {
+    // 1. Post to backend API immediately
+    const res = await postBackendAttendancePunch(
+      {
+        worker_id: empId,
+        worker_name: empName,
+        action: isPunchIn ? 'PUNCH_IN' : 'PUNCH_OUT',
+        timestamp: now.toISOString(),
+      },
+      currentUser?.token
+    );
+
+    if (isPunchIn) {
       // PUNCH IN
       const newShift = {
         date: dateFormatted,
@@ -226,19 +279,14 @@ export const AppProvider = ({ children }) => {
       // Update employee roster status for Admin
       setEmployees(prev =>
         prev.map(emp =>
-          emp.id === empId
+          emp.id === empId || emp.name === empName
             ? { ...emp, status: 'ON DUTY', lastCheckIn: `${dateFormatted}, ${timeFormatted}` }
             : emp
         )
       );
 
-      // Sync with FastAPI Backend if reachable
-      postBackendAttendancePunch({
-        worker_id: empId,
-        worker_name: empName,
-        action: 'PUNCH_IN',
-        timestamp: now.toISOString(),
-      });
+      // Trigger full background sync
+      setTimeout(() => syncBackendAttendance(), 300);
 
       return { action: 'IN', time: timeFormatted, date: dateFormatted, workerName: empName };
     } else {
@@ -246,7 +294,7 @@ export const AppProvider = ({ children }) => {
       const startTime = new Date(activeShift.rawInTime);
       const diffMs = now - startTime;
       const diffMins = Math.max(1, Math.round(diffMs / (1000 * 60)));
-      const hoursWorked = Math.max(0.1, parseFloat((diffMins / 60).toFixed(2)));
+      const hoursWorked = res?.hours_worked || Math.max(0.1, parseFloat((diffMins / 60).toFixed(2)));
       const earned = Math.round(hoursWorked * hourlyRate);
 
       const newRecord = {
@@ -261,13 +309,13 @@ export const AppProvider = ({ children }) => {
         status: 'Completed',
       };
 
-      setEmployeeAttendanceLogs([newRecord, ...employeeAttendanceLogs]);
+      setEmployeeAttendanceLogs(prev => [newRecord, ...prev]);
       setActiveShift(null);
 
       // Update employee roster status for Admin
       setEmployees(prev =>
         prev.map(emp =>
-          emp.id === empId
+          emp.id === empId || emp.name === empName
             ? {
                 ...emp,
                 status: 'OFF DUTY',
@@ -279,14 +327,8 @@ export const AppProvider = ({ children }) => {
         )
       );
 
-      // Sync with FastAPI Backend if reachable
-      postBackendAttendancePunch({
-        worker_id: empId,
-        worker_name: empName,
-        action: 'PUNCH_OUT',
-        timestamp: now.toISOString(),
-        hours_worked: hoursWorked,
-      });
+      // Trigger full background sync
+      setTimeout(() => syncBackendAttendance(), 300);
 
       return { action: 'OUT', time: timeFormatted, date: dateFormatted, hoursWorked, earned, workerName: empName };
     }
@@ -328,6 +370,7 @@ export const AppProvider = ({ children }) => {
         loginAsRole,
         logout,
         punchAttendance,
+        syncBackendAttendance,
         postBuyerRequirement,
       }}
     >

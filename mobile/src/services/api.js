@@ -143,14 +143,35 @@ export async function createBackendRequirement(payload) {
   });
 }
 
-export async function postBackendAttendancePunch(payload) {
+export async function postBackendAttendancePunch(payload, token = null) {
+  const headers = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   return await fetchWithTimeout(`${API_BASE_URL}/attendance/punch`, {
     method: 'POST',
+    headers,
     body: JSON.stringify(payload),
   });
 }
 
-export async function getBackendAttendanceLogs(workerId) {
-  const url = workerId ? `${API_BASE_URL}/attendance/logs?worker_id=${workerId}` : `${API_BASE_URL}/attendance/logs`;
-  return await fetchWithTimeout(url);
+export async function getBackendLiveAttendanceStatus(token = null) {
+  const headers = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return await fetchWithTimeout(`${API_BASE_URL}/attendance/live-status`, {
+    headers,
+  });
+}
+
+export async function getBackendAttendanceLogs(workerId = null, token = null) {
+  const headers = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  const url = workerId
+    ? `${API_BASE_URL}/attendance/logs?worker_id=${encodeURIComponent(workerId)}`
+    : `${API_BASE_URL}/attendance/logs`;
+  return await fetchWithTimeout(url, { headers });
 }
