@@ -183,8 +183,8 @@ def buyer_yarn_catalog(
     db: Session = Depends(get_db),
 ) -> list[dict[str, str]]:
     """Buyer-safe product choices; never expose internal stock quantities."""
-    if user.role != UserRole.BUYER.value:
-        raise HTTPException(403, {"message": "The buyer catalog is available to buyer accounts only.", "code": "BUYER_ONLY"})
+    if user.role not in {UserRole.BUYER.value, UserRole.ADMIN.value}:
+        raise HTTPException(403, {"message": "Buyer or administrator access required.", "code": "WORKSPACE_FORBIDDEN"})
     items = db.query(YarnInventory).order_by(YarnInventory.category, YarnInventory.yarn_name, YarnInventory.yarn_id).all()
     return [
         {
@@ -207,8 +207,8 @@ def buyer_fabric_catalog(
     db: Session = Depends(get_db),
 ) -> list[dict]:
     """Expose approved fabric specs and their existing BOM values, not stock."""
-    if user.role != UserRole.BUYER.value:
-        raise HTTPException(403, {"message": "The buyer catalog is available to buyer accounts only.", "code": "BUYER_ONLY"})
+    if user.role not in {UserRole.BUYER.value, UserRole.ADMIN.value}:
+        raise HTTPException(403, {"message": "Buyer or administrator access required.", "code": "WORKSPACE_FORBIDDEN"})
     recipes = db.query(FabricRecipe).options(selectinload(FabricRecipe.ingredients)).filter(
         FabricRecipe.active.is_(True)
     ).order_by(FabricRecipe.fabric_category, FabricRecipe.fabric_name).all()
