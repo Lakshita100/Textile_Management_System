@@ -9,6 +9,7 @@ import {
   ClipboardList,
   FileText,
   LogOut,
+  Loader2,
   Menu,
   PackageCheck,
   Search,
@@ -16,15 +17,18 @@ import {
   Truck,
 } from 'lucide-react'
 import { buttonClass } from '../components/ui/Button'
+import { productionApi } from '../services/api'
 import { useAuth } from '../store/AuthProvider'
 import {
   addOrderReviewNote,
+  createManualOrder,
   getAdminOverview,
   getAllInquiries,
   getAllOrders,
   getCurrentSession,
   getMaterialAvailability,
   recordDemoMaterialAvailability,
+  recordInventoryMaterialAvailability,
   recordOrderReviewAction,
   respondToInquiry,
   updateInquiryStatus,
@@ -547,32 +551,18 @@ export function AdminManualOrderPage() {
     notes: '',
   })
 
-  const handleCreate = () => {
-    const created = {
-      buyerId: 'buyer-demo',
-      buyerName: 'Admin created order',
+  const handleCreate = async () => {
+    const created = await createManualOrder({
       companyName: form.buyerCompany || 'Manual buyer',
-      source: 'Manual' as const,
       productName: form.productName,
       productCode: form.productCode,
-      yarnType: 'Cotton',
-      materialComposition: 'General textile blend',
-      shade: 'Custom',
       quantity: Number(form.quantity) || 1,
       unit: form.unit,
-      requestedDeliveryDate: form.requestedDeliveryDate || '2026-10-30',
+      requestedDeliveryDate: form.requestedDeliveryDate || '',
       deliveryAddress: form.deliveryAddress || 'Factory dispatch desk',
-      technicalNotes: form.notes,
-      commercialNotes: form.notes,
-      status: 'Submitted',
-    }
-
-    const order = { ...created, id: 'ORD-SYNC', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), submittedAt: new Date().toISOString(), statusHistory: [{ status: 'Submitted', note: 'Manual order received', timestamp: new Date().toISOString() }] }
-
-    const current = getAllOrders()
-    current.unshift(order as any)
-    localStorage.setItem('everest-orders', JSON.stringify(current))
-    navigate('/admin/orders')
+      notes: form.notes,
+    })
+    navigate(`/admin/orders/${created.id}`)
   }
 
   return (
@@ -680,7 +670,39 @@ export function AdminOrderReviewPage() {
   const [reviewConfirmed, setReviewConfirmed] = useState(false)
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState('')
+  const [actionPending, setActionPending] = useState(false)
+  const [schedulingPending, setSchedulingPending] = useState(false)
+  const [actionProgress, setActionProgress] = useState('')
   const material = order ? getMaterialAvailability(order.id) : null
+  const approvalBlockReason = !material
+    ? 'Run the material availability check before approval.'
+    : material.consumedAt
+      ? order?.productionJobId
+        ? 'Production jobs have already been scheduled for this order.'
+        : ''
+    : !['Raw material inventory', 'Fabric recipe inventory'].includes(material.source)
+      ? 'Approval requires a check against live inventory or a fabric recipe, not a manual/demo quantity.'
+    : material.status !== 'Available'
+      ? `Approval requires enough material. Current check: ${material.status}${material.shortageQuantity > 0 ? ` (${material.shortageQuantity} ${material.unit} short)` : ''}.`
+      : !reviewConfirmed
+        ? 'Confirm that you reviewed the product, commercial and delivery requirements.'
+        : ''
+
+  useEffect(() => {
+    if (!actionPending || !schedulingPending) return
+    const machineCheckTimer = window.setTimeout(
+      () => setActionProgress('Finding compatible machines and checking their production windows…'),
+      3000,
+    )
+    const scheduleTimer = window.setTimeout(
+      () => setActionProgress('The production route is still being scheduled. Keep this page open; this can take a little while.'),
+      10000,
+    )
+    return () => {
+      window.clearTimeout(machineCheckTimer)
+      window.clearTimeout(scheduleTimer)
+    }
+  }, [actionPending, schedulingPending])
   void revision
 
   if (!order) {
@@ -690,41 +712,45 @@ export function AdminOrderReviewPage() {
   const reviewer = session?.name ?? 'Admin reviewer'
   const refresh = () => setRevision((value) => value + 1)
 
-  const handleMaterialCheck = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleMaterialCheck = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError('')
-    const quantity = Number(availableQuantity)
-    if (!Number.isFinite(quantity) || quantity < 0) {
-      setError('Enter a valid available quantity (zero or more).')
-      return
-    }
-    let result: ReturnType<typeof recordDemoMaterialAvailability>
     try {
-      result = recordDemoMaterialAvailability(order.id, quantity, materialNote, reviewer)
+      let result: Awaited<ReturnType<typeof recordDemoMaterialAvailability>>
+      if (order.yarnId) {
+        result = await recordInventoryMaterialAvailability(order.id, materialNote)
+      } else if (order.productCategory === 'Fabric') {
+        result = await recordDemoMaterialAvailability(order.id, 0, materialNote)
+      } else {
+        const quantity = Number(availableQuantity)
+        if (!Number.isFinite(quantity) || quantity < 0) {
+          setError('Enter a valid available quantity (zero or more).')
+          return
+        }
+        result = await recordDemoMaterialAvailability(order.id, quantity, materialNote)
+      }
+      if (!result) throw new Error('Unable to save the material check for this order.')
+      setFeedback(order.yarnId || order.productCategory === 'Fabric'
+        ? `Live ${order.productCategory === 'Fabric' ? 'recipe inventory' : 'inventory'} check recorded: ${result.status}.`
+        : `Demo material check recorded: ${result.status}.`)
+      setAvailableQuantity('')
+      setMaterialNote('')
+      refresh()
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save the material check.')
-      return
     }
-    if (!result) {
-      setError('Unable to save the material check for this order.')
-      return
-    }
-    setFeedback(`Demo material check recorded: ${result.status}.`)
-    setAvailableQuantity('')
-    setMaterialNote('')
-    refresh()
   }
 
-  const handleAddNote = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddNote = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setError('')
     if (!reviewNote.trim()) {
       setError('Enter an internal note before saving.')
       return
     }
-    let savedNote: ReturnType<typeof addOrderReviewNote>
+    let savedNote: Awaited<ReturnType<typeof addOrderReviewNote>>
     try {
-      savedNote = addOrderReviewNote(order.id, reviewNote.trim(), reviewer)
+      savedNote = await addOrderReviewNote(order.id, reviewNote.trim(), reviewer)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Unable to save this review note.')
       return
@@ -738,7 +764,7 @@ export function AdminOrderReviewPage() {
     refresh()
   }
 
-  const handleAction = (
+  const handleAction = async (
     action: 'approved' | 'rejected' | 'clarification-requested' | 'held' | 'procurement-requested' | 'delivery-revision-requested',
     status: 'Accepted' | 'Rejected' | 'Clarification Required' | 'Under Review',
   ) => {
@@ -761,9 +787,15 @@ export function AdminOrderReviewPage() {
         ? buyerMessage.trim() || 'Your order request was not approved. Please contact Everest Textile Mills if you need more information.'
         : buyerMessage.trim()
     const actionNote = reviewNote.trim() || (action === 'approved' ? 'Order requirements reviewed and approved.' : '')
-    let updated: ReturnType<typeof recordOrderReviewAction>
+    setError('')
+    setActionPending(true)
+    setSchedulingPending(action === 'approved')
+    setActionProgress(action === 'approved'
+      ? 'Sending this order to production and reserving machine time…'
+      : 'Saving the order decision…')
+    let updated: Awaited<ReturnType<typeof recordOrderReviewAction>>
     try {
-      updated = recordOrderReviewAction(order.id, {
+      updated = await recordOrderReviewAction(order.id, {
         action,
         reviewer,
         note: actionNote,
@@ -773,6 +805,9 @@ export function AdminOrderReviewPage() {
     } catch (actionError) {
       setError(actionError instanceof Error ? actionError.message : 'Unable to record this decision.')
       return
+    } finally {
+      setActionPending(false)
+      setSchedulingPending(false)
     }
     if (!updated) {
       setError('Unable to record this decision.')
@@ -780,7 +815,9 @@ export function AdminOrderReviewPage() {
     }
     setReviewNote('')
     if (action === 'clarification-requested' || action === 'approved' || action === 'rejected') setBuyerMessage('')
-    setFeedback(`Decision recorded for ${order.id}: ${status}.`)
+    setFeedback(action === 'approved' && updated.productionJobId
+      ? `Order scheduled for production. Machine assignments are reserved; first job #${updated.productionJobId}.`
+      : `Decision recorded for ${order.id}: ${updated.status}.`)
     refresh()
   }
 
@@ -802,6 +839,15 @@ export function AdminOrderReviewPage() {
 
       {feedback ? <p role="status" className="rounded-xl border border-success/30 bg-success/5 p-3 text-sm font-medium text-success">{feedback}</p> : null}
       {error ? <p role="alert" className="rounded-xl border border-error/40 bg-error/5 p-3 text-sm font-medium text-error">{error}</p> : null}
+      {actionPending ? (
+        <div role="status" aria-live="polite" className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-ink">
+          <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-primary" />
+          <div>
+            <p className="font-semibold">{actionProgress}</p>
+            {schedulingPending ? <p className="mt-1 text-xs text-muted">The system is checking live inventory, building the route, and reserving each machine step.</p> : null}
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
         <div className="space-y-5">
@@ -842,29 +888,35 @@ export function AdminOrderReviewPage() {
               <>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                   <span className={`rounded-full px-3 py-1 text-sm font-semibold ${material.status === 'Available' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}`}>{material.status}</span>
-                  <span className="text-xs font-semibold uppercase tracking-wide text-warning">Ram demo check · not Maahi data</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-warning">{material.source === 'Ram demo check' ? 'Manual demo check' : material.source === 'Fabric recipe inventory' ? 'Live recipe + inventory' : 'Live inventory'}</span>
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <SummaryTile label="Available" value={`${material.availableQuantity} ${material.unit}`} />
                   <SummaryTile label="Required" value={`${material.requiredQuantity} ${material.unit}`} />
                   <SummaryTile label="Shortage" value={`${material.shortageQuantity} ${material.unit}`} />
                 </div>
+                {material.components?.length ? <div className="mt-4 space-y-2">
+                  {material.components.map((component) => <div key={`${component.yarnId ?? component.material}-${component.material}`} className="flex flex-wrap justify-between gap-2 rounded-lg bg-canvas px-3 py-2 text-xs">
+                    <span className="font-medium text-ink">{component.material}{component.yarnId ? ` · ${component.yarnId}` : ''}</span>
+                    <span className={component.shortageQuantity > 0 ? 'font-semibold text-warning' : 'text-muted'}>{component.availableQuantity} / {component.requiredQuantity} {component.unit}{component.shortageQuantity > 0 ? ` · short ${component.shortageQuantity}` : ''}</span>
+                  </div>)}
+                </div> : null}
                 <p className="mt-3 text-xs text-muted">Checked by {material.checkedBy} · {new Date(material.checkedAt).toLocaleString()}</p>
                 {material.notes ? <p className="mt-2 rounded-xl bg-canvas p-3 text-sm text-muted">{material.notes}</p> : null}
               </>
             ) : (
-              <p className="mt-3 rounded-xl border border-dashed border-line bg-canvas p-4 text-sm text-muted">Availability Not Checked · Awaiting Material Module Integration. No stock quantity is available from Maahi yet; do not assume material is available.</p>
+              <p className="mt-3 rounded-xl border border-dashed border-line bg-canvas p-4 text-sm text-muted">{order.yarnId ? 'Live inventory has not been checked yet. Use the check below to read current stock for the selected yarn.' : 'This order is not linked to an inventory row, so availability needs a manual demo value and cannot verify real stock.'}</p>
             )}
             <form onSubmit={handleMaterialCheck} className="mt-5 space-y-3 border-t border-line pt-4">
-              <p className="text-sm font-semibold text-ink">Manual demo check</p>
-              <p className="text-xs text-muted">Ram may record a review value for workflow testing. This does not query Maahi inventory and is visibly labelled as demo data.</p>
-              <label className="block text-sm font-medium text-ink">Available quantity ({order.unit})
+              <p className="text-sm font-semibold text-ink">{order.yarnId ? 'Check linked inventory stock' : 'Manual demo check'}</p>
+              <p className="text-xs text-muted">{order.yarnId ? 'Reads the selected yarn row from raw material inventory. This check does not reserve or consume stock.' : order.productCategory === 'Fabric' ? 'Scales the selected recipe to this order quantity and checks each required yarn against live stock.' : 'For workflow testing only; this order is not linked to a raw material inventory row.'}</p>
+              {!order.yarnId && order.productCategory !== 'Fabric' ? <label className="block text-sm font-medium text-ink">Available quantity ({order.unit})
                 <input required type="number" min="0" step="any" value={availableQuantity} onChange={(event) => setAvailableQuantity(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm text-ink" />
-              </label>
+              </label> : null}
               <label className="block text-sm font-medium text-ink">Material notes
                 <textarea rows={2} value={materialNote} onChange={(event) => setMaterialNote(event.target.value)} className="mt-2 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-ink" />
               </label>
-              <div className="flex justify-end"><button type="submit" className={buttonClass('secondary', 'md')}>Record demo material check</button></div>
+              <div className="flex justify-end"><button type="submit" className={buttonClass('secondary', 'md')}>{order.yarnId ? 'Check live inventory' : order.productCategory === 'Fabric' ? 'Check recipe inventory' : 'Record demo material check'}</button></div>
             </form>
           </section>
 
@@ -896,11 +948,14 @@ export function AdminOrderReviewPage() {
                 I reviewed the product, commercial and delivery requirements.
               </label>
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => handleAction('clarification-requested', 'Clarification Required')} className={buttonClass('secondary', 'md')}>Request clarification</button>
-                <button type="button" onClick={() => handleAction('rejected', 'Rejected')} className="inline-flex h-11 items-center justify-center rounded-lg border border-error/40 px-5 text-sm font-semibold text-error">Reject with reason</button>
-                <button type="button" disabled={!material || material.status !== 'Available' || !reviewConfirmed} onClick={() => handleAction('approved', 'Accepted')} className={buttonClass('primary', 'md', 'disabled:cursor-not-allowed disabled:opacity-50')}>Approve for production planning</button>
+                <button type="button" disabled={actionPending} onClick={() => handleAction('clarification-requested', 'Clarification Required')} className={buttonClass('secondary', 'md', 'disabled:cursor-not-allowed disabled:opacity-50')}>Request clarification</button>
+                <button type="button" disabled={actionPending} onClick={() => handleAction('rejected', 'Rejected')} className="inline-flex h-11 items-center justify-center rounded-lg border border-error/40 px-5 text-sm font-semibold text-error disabled:cursor-not-allowed disabled:opacity-50">Reject with reason</button>
+                <button type="button" disabled={Boolean(approvalBlockReason) || actionPending} title={approvalBlockReason || undefined} onClick={() => handleAction('approved', 'Accepted')} className={buttonClass('primary', 'md', 'disabled:cursor-not-allowed disabled:opacity-50')}>
+                  {actionPending && schedulingPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sending to production…</> : material?.consumedAt && !order.productionJobId ? 'Schedule production jobs' : 'Approve for production planning'}
+                </button>
               </div>
-              {!material || material.status !== 'Available' ? <p className="text-xs text-muted">Approval is disabled until the material check reports Available.</p> : null}
+              {approvalBlockReason ? <p className="text-xs text-muted">{approvalBlockReason}</p> : null}
+              <p className="text-xs text-muted">{order.productCategory === 'Yarn' ? 'Approval allocates live yarn stock and schedules the inferred yarn process, dyeing when the selected shade requires it, and finishing on configured factory machines. Previously allocated stock is not consumed again when scheduling is retried.' : 'Approval allocates the live yarn requirements and schedules the inferred production route. Stock movements, order approval, and production jobs commit together.'}</p>
             </div>
           </section>
         </div>
@@ -951,14 +1006,15 @@ export function AdminOrderReviewPage() {
 
 export function AdminInquiriesPage() {
   const inquiries = getAllInquiries()
+  const [, setRevision] = useState(0)
   const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState(inquiries[0]?.id ?? '')
   const inquiry = inquiries.find((entry) => entry.id === selectedId) ?? inquiries[0]
 
-  const handleRespond = () => {
+  const handleRespond = async () => {
     if (!inquiry) return
-    respondToInquiry(inquiry.id, 'Thanks for the update. We are reviewing the latest production plan and will respond shortly.')
-    updateInquiryStatus(inquiry.id, 'Awaiting Response')
+    await respondToInquiry(inquiry.id, 'Thanks for the update. We are reviewing the latest production plan and will respond shortly.')
+    setRevision((value) => value + 1)
   }
 
   return (
@@ -1005,8 +1061,8 @@ export function AdminInquiriesPage() {
               </div>
 
               <div className="mt-5 flex justify-end gap-2">
-                <button type="button" onClick={() => updateInquiryStatus(inquiry.id, 'Resolved')} className={buttonClass('secondary', 'md')}>Mark resolved</button>
-                <button type="button" onClick={handleRespond} className={buttonClass('primary', 'md')}>Reply</button>
+                <button type="button" onClick={() => void updateInquiryStatus(inquiry.id, 'Resolved').then(() => setRevision((value) => value + 1))} className={buttonClass('secondary', 'md')}>Mark resolved</button>
+                <button type="button" onClick={() => void handleRespond()} className={buttonClass('primary', 'md')}>Reply</button>
               </div>
             </>
           ) : null}
@@ -1020,30 +1076,48 @@ export function AdminModulePlaceholderPage({ title, description }: { title: stri
   const productionOrders = title === 'Production Management'
     ? getAllOrders().filter((order) => ['Accepted', 'Scheduled', 'In Production'].includes(order.status))
     : []
+  const [scheduledJobs, setScheduledJobs] = useState<import('../types').Job[]>([])
+  const [jobLoadError, setJobLoadError] = useState('')
+  const orderIds = productionOrders.map((order) => order.id).join('|')
+
+  useEffect(() => {
+    if (title !== 'Production Management') return
+    let active = true
+    productionApi.jobs({ page: 1, page_size: 100 })
+      .then((result) => {
+        if (active) setScheduledJobs(result.items.filter((job) => productionOrders.some((order) => order.id === job.order_ref)))
+      })
+      .catch((loadError: unknown) => {
+        if (active) setJobLoadError(loadError instanceof Error ? loadError.message : 'Could not load assigned production jobs.')
+      })
+    return () => { active = false }
+  }, [title, orderIds])
 
   return (
     <div className="rounded-2xl border border-line bg-surface p-8 shadow-card">
       <h1 className="text-2xl font-bold text-ink">{title}</h1>
       <p className="mt-3 max-w-2xl text-sm text-muted">{description}</p>
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        <SummaryTile label="Current status" value="Awaiting integration" />
-        <SummaryTile label="Orders covered" value="Linked via orderId" />
-        <SummaryTile label="Next step" value="Connect module API" />
+        <SummaryTile label="Current status" value={title === 'Production Management' ? 'Scheduled jobs' : 'Awaiting integration'} />
+        <SummaryTile label="Orders covered" value={title === 'Production Management' ? 'Linked to buyer orders' : 'Linked via orderId'} />
+        <SummaryTile label="Next step" value={title === 'Production Management' ? 'Track assigned machine jobs' : 'Connect module API'} />
       </div>
       {title === 'Production Management' ? (
         <section className="mt-8 border-t border-line pt-6">
-          <h2 className="text-lg font-semibold text-ink">Approved orders for Lakshita’s planning</h2>
-          <p className="mt-1 text-sm text-muted">Accepted orders are visible here with their original Order ID. Production planning remains an integration boundary.</p>
+          <h2 className="text-lg font-semibold text-ink">Approved orders and assigned production jobs</h2>
+          <p className="mt-1 text-sm text-muted">Each scheduled process is linked to its buyer order and assigned machine.</p>
           <div className="mt-4 space-y-3">
             {productionOrders.length === 0
               ? <p className="rounded-xl bg-canvas p-4 text-sm text-muted">No approved orders are ready for production planning.</p>
               : productionOrders.map((order) => (
                 <Link key={order.id} to={`/admin/orders/${order.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-line bg-canvas p-4">
-                  <span><span className="font-semibold text-primary">{order.id}</span><span className="ml-3 text-sm text-ink">{order.productName} · {order.quantity} {order.unit}</span></span>
+                  <span><span className="font-semibold text-primary">{order.id}</span><span className="ml-3 text-sm text-ink">{order.productName} · {order.quantity} {order.unit}</span>{order.productionJobId ? <span className="ml-2 text-xs text-muted">First job #{order.productionJobId}</span> : null}</span>
                   <span className="text-xs font-semibold text-muted">{order.status} · {order.companyName}</span>
                 </Link>
               ))}
           </div>
+          {jobLoadError ? <p role="alert" className="mt-4 text-sm text-error">{jobLoadError}</p> : null}
+          {scheduledJobs.length ? <div className="mt-5 overflow-x-auto rounded-xl border border-line"><table className="w-full min-w-[620px] text-left text-sm"><thead className="bg-canvas text-xs uppercase text-muted"><tr><th className="p-3">Job</th><th className="p-3">Order</th><th className="p-3">Process</th><th className="p-3">Machine</th><th className="p-3">Status</th><th className="p-3">Planned window</th></tr></thead><tbody>{scheduledJobs.map((job) => <tr key={job.id} className="border-t border-line"><td className="p-3 font-semibold">#{job.id}</td><td className="p-3">{job.order_ref}</td><td className="p-3">{job.required_process}</td><td className="p-3">#{job.machine_id}</td><td className="p-3">{job.status}</td><td className="p-3">{job.planned_start ? new Date(job.planned_start).toLocaleString() : 'Unscheduled'}</td></tr>)}</tbody></table></div> : productionOrders.length ? <p className="mt-4 text-sm text-muted">No machine jobs are linked to these accepted orders yet.</p> : null}
         </section>
       ) : null}
     </div>

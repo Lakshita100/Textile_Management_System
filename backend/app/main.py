@@ -40,6 +40,14 @@ def create_app() -> FastAPI:
             seed_user(db, email="worker@everestmills.com", password="Worker12345678", full_name="Ramesh Kumar", role="staff", company="Everest Textile Mills")
             seed_user(db, email="admin@everestmills.com", password="Admin12345678", full_name="Rajesh Mehta", role="admin", company="Everest Textile Mills")
 
+            # Backfill IDs for staff/admin accounts created before login IDs were
+            # added. Their existing password hashes and permissions are untouched.
+            for account in db.query(User).filter(User.role.in_(["staff", "admin"])).all():
+                if not account.login_id:
+                    prefix = "ADM" if account.role == "admin" else "EMP"
+                    account.login_id = f"{prefix}-{account.id:06d}"
+            db.flush()
+
             # Employee Head Account
             head_user = db.query(User).filter(User.email == "head@gmail.com").first()
             if not head_user:

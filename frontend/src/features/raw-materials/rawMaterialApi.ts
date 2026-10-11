@@ -55,6 +55,10 @@ export const rawMaterialApi = {
     return http.get<PageResponse<YarnItem>>(`/inventory?${inventoryQuery(filters, page, pageSize)}`);
   },
 
+  getYarn(yarnId: string): Promise<YarnItem> {
+    return http.get<YarnItem>(`/inventory/${encodeURIComponent(yarnId)}`);
+  },
+
   getSummary(): Promise<InventorySummary> {
     return http.get<InventorySummary>('/inventory/summary');
   },

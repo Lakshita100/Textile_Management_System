@@ -1,3 +1,5 @@
+import { http } from './http'
+
 export type BuyerRole = 'buyer' | 'admin'
 
 export type OrderStatus =
@@ -10,8 +12,12 @@ export type OrderStatus =
   | 'Scheduled'
   | 'In Production'
   | 'Quality Check'
+  | 'Packing'
   | 'Ready to Dispatch'
   | 'Dispatched'
+  | 'Partially Dispatched'
+  | 'In Transit'
+  | 'Partially Delivered'
   | 'Delivered'
   | 'Rejected'
   | 'Cancelled'
@@ -29,7 +35,18 @@ export interface MaterialAvailability {
   notes: string
   checkedBy: string
   checkedAt: string
-  source: 'Ram demo check'
+  source: 'Ram demo check' | 'Raw material inventory' | 'Fabric recipe inventory'
+  consumedAt?: string
+  consumedMaterials?: Array<{ yarnId: string; quantity: number; unit: string; movementId: string }>
+  components?: Array<{
+    material: string
+    yarnId: string | null
+    requiredQuantity: number
+    availableQuantity: number
+    shortageQuantity: number
+    unit: string
+    status: MaterialAvailabilityStatus
+  }>
 }
 
 export interface BuyerVisibleUpdate {
@@ -54,6 +71,7 @@ export interface BuyerUser {
   address: string
   city: string
   country: string
+  postalCode: string
   website?: string
   businessRegistration?: string
   createdAt: string
@@ -73,6 +91,7 @@ export interface OrderRecord {
   source: 'Buyer Portal' | 'Manual'
   productName: string
   productCode: string
+  yarnId?: string
   yarnType: string
   materialComposition: string
   shade: string
@@ -96,6 +115,7 @@ export interface OrderRecord {
   buyerVisibleUpdates?: BuyerVisibleUpdate[]
   reviewHistory?: OrderReviewEvent[]
   materialAvailability?: MaterialAvailability
+  productionJobId?: number | null
   status: OrderStatus
   createdAt: string
   updatedAt: string
@@ -137,163 +157,14 @@ const STORAGE_KEYS = {
 }
 
 const isoNow = () => new Date().toISOString()
-
-const seedOrders = (): OrderRecord[] => [
-  {
-    id: 'ORD-2048',
-    buyerId: 'buyer-demo',
-    buyerName: 'Aisha Rahman',
-    companyName: 'Northwind Retail',
-    source: 'Buyer Portal',
-    productName: 'Cotton Twill Yarn',
-    productCode: 'CTY-1001',
-    yarnType: 'Cotton',
-    materialComposition: '100% Cotton',
-    shade: 'Navy Blue',
-    quantity: 1200,
-    unit: 'kg',
-    requestedDeliveryDate: '2026-10-14',
-    deliveryAddress: 'Plot 18, Bhiwandi Industrial Estate, Maharashtra',
-    deliveryInstructions: 'Gate 3, forklift required',
-    technicalNotes: 'Need low lint and high twist.',
-    commercialNotes: 'Looking for 3% price flexibility if lead time is maintained.',
-    status: 'In Production',
-    createdAt: '2026-10-02T09:35:00.000Z',
-    updatedAt: '2026-10-06T13:15:00.000Z',
-    submittedAt: '2026-10-02T09:35:00.000Z',
-    statusHistory: [
-      { status: 'Submitted', note: 'Order submitted from buyer portal', timestamp: '2026-10-02T09:35:00.000Z' },
-      { status: 'Under Review', note: 'Commercial team reviewing quantity and delivery', timestamp: '2026-10-02T12:00:00.000Z' },
-      { status: 'Accepted', note: 'Order accepted with delivery commitment', timestamp: '2026-10-03T15:40:00.000Z' },
-      { status: 'Material Check', note: 'Raw cotton allocation confirmed', timestamp: '2026-10-04T10:15:00.000Z' },
-      { status: 'Scheduled', note: 'Production slot reserved for week 42', timestamp: '2026-10-05T08:15:00.000Z' },
-      { status: 'In Production', note: 'Twill spinning initiated', timestamp: '2026-10-06T13:15:00.000Z' },
-    ],
-  },
-  {
-    id: 'ORD-2054',
-    buyerId: 'buyer-demo',
-    buyerName: 'Aisha Rahman',
-    companyName: 'Northwind Retail',
-    source: 'Buyer Portal',
-    productName: 'Recycled Polyester Blend',
-    productCode: 'RPB-880',
-    yarnType: 'Synthetic',
-    materialComposition: '65% Recycled Polyester / 35% Cotton',
-    shade: 'Stone Grey',
-    quantity: 850,
-    unit: 'kg',
-    requestedDeliveryDate: '2026-10-18',
-    deliveryAddress: 'Plot 18, Bhiwandi Industrial Estate, Maharashtra',
-    deliveryInstructions: 'Use palletised unloading',
-    technicalNotes: 'Need medium twist and consistent dye lot.',
-    commercialNotes: 'Please share quotation before production approval.',
-    status: 'Quotation Sent',
-    createdAt: '2026-10-05T16:25:00.000Z',
-    updatedAt: '2026-10-07T08:25:00.000Z',
-    submittedAt: '2026-10-05T16:25:00.000Z',
-    statusHistory: [
-      { status: 'Submitted', note: 'Buyer submitted RFQ for eco-friendly blend', timestamp: '2026-10-05T16:25:00.000Z' },
-      { status: 'Under Review', note: 'Technical team validating yarn specification', timestamp: '2026-10-06T09:20:00.000Z' },
-      { status: 'Quotation Sent', note: 'Quotation delivered for buyer review', timestamp: '2026-10-07T08:25:00.000Z' },
-    ],
-  },
-  {
-    id: 'ORD-2091',
-    buyerId: 'buyer-2',
-    buyerName: 'Riya Mehta',
-    companyName: 'Bluepeak Apparel',
-    source: 'Manual',
-    productName: 'Premium Denim Yarn',
-    productCode: 'DNY-412',
-    yarnType: 'Denim',
-    materialComposition: '98% Cotton / 2% Lycra',
-    shade: 'Deep Indigo',
-    quantity: 1400,
-    unit: 'kg',
-    requestedDeliveryDate: '2026-10-22',
-    deliveryAddress: 'Warehouse 5, Surat Textile Cluster, Gujarat',
-    deliveryInstructions: 'Packed in 25 kg bags',
-    technicalNotes: 'Need stretch recovery and even dye consistency.',
-    commercialNotes: 'Urgent dispatch preference if available.',
-    status: 'Ready to Dispatch',
-    createdAt: '2026-09-28T11:10:00.000Z',
-    updatedAt: '2026-10-08T14:20:00.000Z',
-    submittedAt: '2026-09-28T11:10:00.000Z',
-    statusHistory: [
-      { status: 'Submitted', note: 'Manual order received by sales desk', timestamp: '2026-09-28T11:10:00.000Z' },
-      { status: 'Accepted', note: 'Order accepted after technical validation', timestamp: '2026-09-29T09:45:00.000Z' },
-      { status: 'Material Check', note: 'Yarn lot aligned', timestamp: '2026-09-30T12:00:00.000Z' },
-      { status: 'Scheduled', note: 'Production scheduled to complete by Oct 19', timestamp: '2026-10-02T10:00:00.000Z' },
-      { status: 'In Production', note: 'Production in final shift', timestamp: '2026-10-05T16:00:00.000Z' },
-      { status: 'Quality Check', note: 'Quality pass with minor rework', timestamp: '2026-10-07T18:25:00.000Z' },
-      { status: 'Ready to Dispatch', note: 'Dispatch cleared for warehouse release', timestamp: '2026-10-08T14:20:00.000Z' },
-    ],
-  },
-]
-
-const seedBuyers = (): BuyerUser[] => [
-  {
-    id: 'buyer-demo',
-    companyName: 'Northwind Retail',
-    contactName: 'Aisha Rahman',
-    email: 'buyer@everestmills.com',
-    phone: '+91 98765 43210',
-    address: '14 Market Road, Andheri East',
-    city: 'Mumbai',
-    country: 'India',
-    website: 'https://northwindretail.example',
-    businessRegistration: 'GSTIN: 27AABCN1234F1Z2',
-    createdAt: '2026-09-01T08:00:00.000Z',
-  },
-  {
-    id: 'buyer-2',
-    companyName: 'Bluepeak Apparel',
-    contactName: 'Riya Mehta',
-    email: 'riya@bluepeak.app',
-    phone: '+91 99887 66554',
-    address: '93 Textile Avenue, Ring Road',
-    city: 'Surat',
-    country: 'India',
-    businessRegistration: 'GSTIN: 24ABCDQ1234F1Z5',
-    createdAt: '2026-09-10T10:00:00.000Z',
-  },
-]
-
-const seedInquiries = (): InquiryRecord[] => [
-  {
-    id: 'INQ-1001',
-    buyerId: 'buyer-demo',
-    orderId: 'ORD-2048',
-    subject: 'Requesting technical clarification on twist specification',
-    type: 'Product',
-    status: 'Awaiting Response',
-    createdAt: '2026-10-06T12:00:00.000Z',
-    updatedAt: '2026-10-07T16:00:00.000Z',
-    messages: [
-      { sender: 'buyer', text: 'Can you confirm if 36s twist is acceptable for this batch?', timestamp: '2026-10-06T12:00:00.000Z' },
-      { sender: 'admin', text: 'Yes, the mill can support 36s twist with a slight variation tolerance of ±3%.', timestamp: '2026-10-07T16:00:00.000Z' },
-    ],
-  },
-  {
-    id: 'INQ-1002',
-    buyerId: 'buyer-2',
-    orderId: 'ORD-2091',
-    subject: 'Dispatch timing for warehouse handoff',
-    type: 'Delivery',
-    status: 'Open',
-    createdAt: '2026-10-08T09:00:00.000Z',
-    updatedAt: '2026-10-08T09:00:00.000Z',
-    messages: [
-      { sender: 'buyer', text: 'Please confirm whether a dispatch window is available for next Tuesday.', timestamp: '2026-10-08T09:00:00.000Z' },
-    ],
-  },
-]
+const workspaceCache = new Map<string, unknown>()
 
 const readStored = <T,>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') {
     return fallback
   }
+
+  if (key !== STORAGE_KEYS.session) return (workspaceCache.get(key) as T | undefined) ?? fallback
 
   const value = window.localStorage.getItem(key)
   if (!value) {
@@ -312,24 +183,56 @@ const writeStored = <T,>(key: string, value: T) => {
     return
   }
 
+  if (key !== STORAGE_KEYS.session) {
+    workspaceCache.set(key, value)
+    return
+  }
+
   window.localStorage.setItem(key, JSON.stringify(value))
 }
 
 const ensureSeedData = () => {
-  const buyers = readStored<BuyerUser[]>(STORAGE_KEYS.buyers, [])
-  if (!buyers.length) {
-    writeStored(STORAGE_KEYS.buyers, seedBuyers())
-  }
+  // Buyer, order, and inquiry records are loaded from the authenticated API.
+}
 
-  const orders = readStored<OrderRecord[]>(STORAGE_KEYS.orders, [])
-  if (!orders.length) {
-    writeStored(STORAGE_KEYS.orders, seedOrders())
-  }
+export const hydrateBuyerWorkspace = async (): Promise<void> => {
+  const [orders, inquiries] = await Promise.all([
+    http.get<OrderRecord[]>('/orders'),
+    http.get<InquiryRecord[]>('/inquiries'),
+  ])
+  writeStored(STORAGE_KEYS.orders, orders)
+  writeStored(STORAGE_KEYS.inquiries, inquiries)
+}
 
-  const inquiries = readStored<InquiryRecord[]>(STORAGE_KEYS.inquiries, [])
-  if (!inquiries.length) {
-    writeStored(STORAGE_KEYS.inquiries, seedInquiries())
-  }
+export const clearBuyerWorkspace = () => {
+  workspaceCache.delete(STORAGE_KEYS.buyers)
+  workspaceCache.delete(STORAGE_KEYS.orders)
+  workspaceCache.delete(STORAGE_KEYS.inquiries)
+}
+
+const cacheOrder = (updated: OrderRecord) => {
+  writeStored(STORAGE_KEYS.orders, getAllOrders().map((order) => order.id === updated.id ? updated : order))
+  return updated
+}
+
+const cacheInquiry = (updated: InquiryRecord) => {
+  writeStored(STORAGE_KEYS.inquiries, getAllInquiries().map((inquiry) => inquiry.id === updated.id ? updated : inquiry))
+  return updated
+}
+
+export const submitBuyerOrder = async (order: BuyerOrderDraft): Promise<OrderRecord> => {
+  const created = await http.post<OrderRecord>('/orders', order)
+  writeStored(STORAGE_KEYS.orders, [created, ...getAllOrders()])
+  return created
+}
+
+export const createManualOrder = async (input: {
+  companyName: string; productName: string; productCode: string; quantity: number; unit: string;
+  requestedDeliveryDate: string; deliveryAddress: string; notes: string;
+}): Promise<OrderRecord> => {
+  const created = await http.post<OrderRecord>('/orders/manual', input)
+  writeStored(STORAGE_KEYS.orders, [created, ...getAllOrders()])
+  return created
 }
 
 export const getAllBuyers = () => {
@@ -371,6 +274,7 @@ export const setCurrentSession = (session: SessionUser | null) => {
 
   if (!session) {
     window.localStorage.removeItem(STORAGE_KEYS.session)
+    clearBuyerWorkspace()
     return
   }
 
@@ -395,6 +299,10 @@ export const syncAuthenticatedBuyer = (account: {
   email: string | null
   company: string | null
   phone: string | null
+  address?: string | null
+  city?: string | null
+  country?: string | null
+  postal_code?: string | null
 }) => {
   if (!account.email) return
   const id = `user-${account.id}`
@@ -406,9 +314,10 @@ export const syncAuthenticatedBuyer = (account: {
     contactName: account.full_name,
     email: account.email,
     phone: account.phone ?? existing?.phone ?? '',
-    address: existing?.address ?? '',
-    city: existing?.city ?? '',
-    country: existing?.country ?? '',
+    address: account.address ?? existing?.address ?? '',
+    city: account.city ?? existing?.city ?? '',
+    country: account.country ?? existing?.country ?? '',
+    postalCode: account.postal_code ?? existing?.postalCode ?? '',
     website: existing?.website,
     businessRegistration: existing?.businessRegistration,
     createdAt: existing?.createdAt ?? isoNow(),
@@ -442,7 +351,7 @@ export type BuyerOrderDraft = Omit<
   | 'buyerVisibleUpdates'
   | 'reviewHistory'
   | 'materialAvailability'
-> & { source?: 'Buyer Portal'; status?: OrderStatus }
+> & { status?: OrderStatus }
 
 export const createOrderForBuyer = (buyerId: string, order: BuyerOrderDraft) => {
   const buyer = getAllBuyers().find((entry) => entry.id === buyerId)
@@ -494,11 +403,10 @@ export const getMaterialAvailability = (orderId: string) => {
   return getOrderById(orderId)?.materialAvailability ?? null
 }
 
-export const recordDemoMaterialAvailability = (
+export const recordDemoMaterialAvailability = async (
   orderId: string,
   availableQuantity: number,
   notes: string,
-  checkedBy: string,
 ) => {
   const orders = getAllOrders()
   const index = orders.findIndex((order) => order.id === orderId)
@@ -508,31 +416,31 @@ export const recordDemoMaterialAvailability = (
   }
 
   const order = orders[index]
-  const checkedAt = isoNow()
-  const checkedQuantity = Math.max(0, availableQuantity)
-  const materialAvailability: MaterialAvailability = {
-    orderId,
-    status: checkedQuantity >= order.quantity
-      ? 'Available'
-      : checkedQuantity > 0
-        ? 'Partially Available'
-        : 'Insufficient Stock',
-    availableQuantity: checkedQuantity,
-    requiredQuantity: order.quantity,
-    shortageQuantity: Math.max(0, order.quantity - checkedQuantity),
+  const saved = await http.post<OrderRecord>(`/orders/${encodeURIComponent(orderId)}/material-check`, {
+    availableQuantity,
     unit: order.unit,
     notes,
-    checkedBy,
-    checkedAt,
-    source: 'Ram demo check',
-  }
-
-  orders[index] = { ...order, materialAvailability, updatedAt: checkedAt }
-  writeStored(STORAGE_KEYS.orders, orders)
-  return materialAvailability
+  })
+  cacheOrder(saved)
+  return saved.materialAvailability ?? null
 }
 
-export const addOrderReviewNote = (orderId: string, note: string, reviewer: string) => {
+export const recordInventoryMaterialAvailability = async (
+  orderId: string,
+  notes: string,
+) => {
+  const orders = getAllOrders()
+  const index = orders.findIndex((order) => order.id === orderId)
+  if (index === -1) return null
+
+  const order = orders[index]
+  if (!order.yarnId) throw new Error('This order is not linked to a yarn inventory row.')
+  const saved = await http.post<OrderRecord>(`/orders/${encodeURIComponent(orderId)}/material-check`, { notes })
+  cacheOrder(saved)
+  return saved.materialAvailability ?? null
+}
+
+export const addOrderReviewNote = async (orderId: string, note: string, reviewer: string) => {
   return recordOrderReviewAction(orderId, {
     action: 'note',
     reviewer,
@@ -540,7 +448,7 @@ export const addOrderReviewNote = (orderId: string, note: string, reviewer: stri
   })
 }
 
-export const recordOrderReviewAction = (
+export const recordOrderReviewAction = async (
   orderId: string,
   event: Omit<OrderReviewEvent, 'timestamp'> & { buyerMessage?: string; nextStatus?: OrderStatus },
 ) => {
@@ -551,118 +459,31 @@ export const recordOrderReviewAction = (
     return null
   }
 
-  const order = orders[index]
-  if (event.action === 'approved' && order.materialAvailability?.status !== 'Available') {
-    throw new Error('An order can only be approved after an available material check.')
-  }
-  if (event.action === 'rejected' && !event.note.trim()) {
-    throw new Error('A rejection reason is required.')
-  }
-  if (
-    (event.action === 'clarification-requested' || event.action === 'delivery-revision-requested')
-    && !event.buyerMessage?.trim()
-  ) {
-    throw new Error('A buyer-visible clarification message is required.')
-  }
-  const timestamp = isoNow()
-  const status = event.nextStatus ?? order.status
-  const buyerVisibleUpdates = event.buyerMessage?.trim()
-    ? [...(order.buyerVisibleUpdates ?? []), { message: event.buyerMessage.trim(), sender: 'admin' as const, timestamp }]
-    : order.buyerVisibleUpdates ?? []
-  const updatedOrder = {
-    ...order,
-    status,
-    updatedAt: timestamp,
-    statusHistory: status === order.status
-      ? order.statusHistory
-      : [...order.statusHistory, {
-        status,
-        note: event.buyerMessage?.trim() || `Your order status was updated to ${status}.`,
-        timestamp,
-      }],
-    buyerVisibleUpdates,
-    reviewHistory: [...(order.reviewHistory ?? []), {
-      action: event.action,
-      reviewer: event.reviewer,
-      note: event.note,
-      timestamp,
-    }],
-  }
-
-  orders[index] = updatedOrder
-  writeStored(STORAGE_KEYS.orders, orders)
-  return updatedOrder
+  const saved = await http.post<OrderRecord>(`/orders/${encodeURIComponent(orderId)}/review`, event, { timeoutMs: 120_000 })
+  return cacheOrder(saved)
 }
 
-export const addBuyerOrderResponse = (orderId: string, message: string, buyerId: string) => {
+export const addBuyerOrderResponse = async (orderId: string, message: string, buyerId: string) => {
   const orders = getAllOrders()
   const index = orders.findIndex((order) => order.id === orderId && order.buyerId === buyerId)
   if (index === -1) return null
 
-  const timestamp = isoNow()
-  const order = orders[index]
-  const updatedOrder: OrderRecord = {
-    ...order,
-    status: 'Under Review',
-    updatedAt: timestamp,
-    statusHistory: [...order.statusHistory, {
-      status: 'Under Review',
-      note: 'Your response was received and the order is back under review.',
-      timestamp,
-    }],
-    buyerVisibleUpdates: [...(order.buyerVisibleUpdates ?? []), {
-      message: message.trim(),
-      sender: 'buyer',
-      timestamp,
-    }],
-    reviewHistory: [...(order.reviewHistory ?? []), {
-      action: 'buyer-response',
-      reviewer: order.buyerName,
-      note: 'Buyer submitted a response to the clarification request.',
-      timestamp,
-    }],
-  }
-  orders[index] = updatedOrder
-  writeStored(STORAGE_KEYS.orders, orders)
-  return updatedOrder
+  const saved = await http.post<OrderRecord>(`/orders/${encodeURIComponent(orderId)}/buyer-response`, { message })
+  return cacheOrder(saved)
 }
 
-export const updateOrderStatus = (orderId: string, nextStatus: OrderStatus, note: string) => {
+export const updateOrderStatus = async (orderId: string, nextStatus: OrderStatus, note: string) => {
   const orders = getAllOrders()
   const index = orders.findIndex((order) => order.id === orderId)
 
   if (index === -1) return null
 
-  const order = orders[index]
-  const timestamp = isoNow()
-  const updatedOrder = {
-    ...order,
-    status: nextStatus,
-    updatedAt: timestamp,
-    statusHistory: [...order.statusHistory, { status: nextStatus, note, timestamp }],
-  }
-
-  orders[index] = updatedOrder
-  writeStored(STORAGE_KEYS.orders, orders)
-  return updatedOrder
+  const saved = await http.patch<OrderRecord>(`/orders/${encodeURIComponent(orderId)}/status`, { status: nextStatus, note })
+  return cacheOrder(saved)
 }
-export const createInquiryForOrder = (buyerId: string, orderId: string, subject: string, type: InquiryRecord['type'], message: string) => {
-  const createdAt = isoNow()
-  const record: InquiryRecord = {
-    id: `INQ-${Math.floor(1000 + Math.random() * 9000)}`,
-    buyerId,
-    orderId,
-    subject,
-    type,
-    status: 'Open',
-    createdAt,
-    updatedAt: createdAt,
-    messages: [{ sender: 'buyer', text: message, timestamp: createdAt }],
-  }
-
-  const inquiries = getAllInquiries()
-  inquiries.unshift(record)
-  writeStored(STORAGE_KEYS.inquiries, inquiries)
+export const createInquiryForOrder = async (orderId: string, subject: string, type: InquiryRecord['type'], message: string) => {
+  const record = await http.post<InquiryRecord>('/inquiries', { orderId, subject, type, message })
+  writeStored(STORAGE_KEYS.inquiries, [record, ...getAllInquiries()])
   return record
 }
 
@@ -670,7 +491,7 @@ export const getInquiriesForBuyer = (buyerId: string) => {
   return getAllInquiries().filter((inquiry) => inquiry.buyerId === buyerId)
 }
 
-export const respondToInquiry = (inquiryId: string, message: string) => {
+export const respondToInquiry = async (inquiryId: string, message: string) => {
   const inquiries = getAllInquiries()
   const index = inquiries.findIndex((inquiry) => inquiry.id === inquiryId)
 
@@ -678,21 +499,11 @@ export const respondToInquiry = (inquiryId: string, message: string) => {
     return null
   }
 
-  const inquiry = inquiries[index]
-  const timestamp = isoNow()
-  const updatedInquiry: InquiryRecord = {
-    ...inquiry,
-    status: 'Awaiting Response',
-    updatedAt: timestamp,
-    messages: [...inquiry.messages, { sender: 'admin', text: message, timestamp }],
-  }
-
-  inquiries[index] = updatedInquiry
-  writeStored(STORAGE_KEYS.inquiries, inquiries)
-  return updatedInquiry
+  const saved = await http.post<InquiryRecord>(`/inquiries/${encodeURIComponent(inquiryId)}/messages`, { message })
+  return cacheInquiry(saved)
 }
 
-export const updateInquiryStatus = (inquiryId: string, status: InquiryStatus) => {
+export const updateInquiryStatus = async (inquiryId: string, status: InquiryStatus) => {
   const inquiries = getAllInquiries()
   const index = inquiries.findIndex((inquiry) => inquiry.id === inquiryId)
 
@@ -700,16 +511,8 @@ export const updateInquiryStatus = (inquiryId: string, status: InquiryStatus) =>
     return null
   }
 
-  const inquiry = inquiries[index]
-  const updatedInquiry = {
-    ...inquiry,
-    status,
-    updatedAt: isoNow(),
-  }
-
-  inquiries[index] = updatedInquiry
-  writeStored(STORAGE_KEYS.inquiries, inquiries)
-  return updatedInquiry
+  const saved = await http.patch<InquiryRecord>(`/inquiries/${encodeURIComponent(inquiryId)}/status`, { status })
+  return cacheInquiry(saved)
 }
 
 export const getAdminOverview = () => {

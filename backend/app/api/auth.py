@@ -7,12 +7,16 @@ import secrets
 from fastapi import APIRouter, Depends, Header, HTTPException
 import httpx
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
 from app.models.auth import FEATURE_PERMISSIONS, User, UserRole
+from app.models.yarn import YarnInventory
+from app.models.order import FabricRecipe
 from app.schemas.auth import (
     ChangePasswordIn,
+    BuyerProfileUpdateIn,
     EmployeeCreateIn,
     EmployeeUpdateIn,
     GoogleLoginIn,
@@ -151,6 +155,86 @@ def google_login(payload: GoogleLoginIn, db: Session = Depends(get_db)) -> Token
 @router.get("/me", response_model=UserOut)
 def me(user: User = Depends(current_user)) -> UserOut:
     return UserOut.model_validate(user)
+
+
+@router.patch("/profile", response_model=UserOut)
+def update_buyer_profile(
+    payload: BuyerProfileUpdateIn,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    if user.role != UserRole.BUYER.value:
+        raise HTTPException(403, {"message": "Buyer profile updates are available to buyer accounts only.", "code": "BUYER_ONLY"})
+    user.full_name = payload.full_name
+    user.company = payload.company.strip()
+    user.phone = payload.phone
+    user.address = payload.address.strip()
+    user.city = payload.city.strip()
+    user.country = payload.country.strip()
+    user.postal_code = payload.postal_code.strip()
+    db.commit()
+    db.refresh(user)
+    return UserOut.model_validate(user)
+
+
+@router.get("/catalog/yarn")
+def buyer_yarn_catalog(
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> list[dict[str, str]]:
+    """Buyer-safe product choices; never expose internal stock quantities."""
+    if user.role != UserRole.BUYER.value:
+        raise HTTPException(403, {"message": "The buyer catalog is available to buyer accounts only.", "code": "BUYER_ONLY"})
+    items = db.query(YarnInventory).order_by(YarnInventory.category, YarnInventory.yarn_name, YarnInventory.yarn_id).all()
+    return [
+        {
+            "yarnId": item.yarn_id,
+            "yarnName": item.yarn_name,
+            "productCode": item.product_code,
+            "category": item.category,
+            "materialComposition": item.material_composition,
+            "denierSpecification": item.denier_specification,
+            "colourShade": item.colour_shade,
+            "unit": item.unit,
+        }
+        for item in items
+    ]
+
+
+@router.get("/catalog/fabric")
+def buyer_fabric_catalog(
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> list[dict]:
+    """Expose approved fabric specs and their existing BOM values, not stock."""
+    if user.role != UserRole.BUYER.value:
+        raise HTTPException(403, {"message": "The buyer catalog is available to buyer accounts only.", "code": "BUYER_ONLY"})
+    recipes = db.query(FabricRecipe).options(selectinload(FabricRecipe.ingredients)).filter(
+        FabricRecipe.active.is_(True)
+    ).order_by(FabricRecipe.fabric_category, FabricRecipe.fabric_name).all()
+    return [
+        {
+            "recipeCode": recipe.recipe_code,
+            "fabricName": recipe.fabric_name,
+            "fabricCategory": recipe.fabric_category,
+            "construction": recipe.construction,
+            "finishedWeightKg": recipe.finished_weight_kg,
+            "expectedWastePercent": recipe.expected_waste_percent,
+            "ingredients": [
+                {
+                    "lineNo": ingredient.line_no,
+                    "yarnId": ingredient.yarn_id,
+                    "yarnRole": ingredient.yarn_role,
+                    "yarnType": ingredient.yarn_type,
+                    "specification": ingredient.specification,
+                    "quantityKg": ingredient.quantity_kg,
+                    "wastePercent": ingredient.waste_percent,
+                }
+                for ingredient in recipe.ingredients
+            ],
+        }
+        for recipe in recipes
+    ]
 
 
 @router.post("/change-password", response_model=UserOut)

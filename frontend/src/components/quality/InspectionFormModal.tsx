@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useSession } from '../../store/session'
+import { useAuth } from '../../store/AuthProvider'
 import { useInspectionForm } from '../../store/inspectionFormContext'
 import { useAsync } from '../../hooks/useAsync'
-import { queueFromInspection } from '../../services/packingService'
 import {
   createInspection,
   DEFECT_TYPES,
@@ -43,11 +42,13 @@ const inputClass = (hasError: boolean) =>
 
 export default function InspectionFormModal({ initialMachineId }: { initialMachineId?: string } = {}) {
   const { closeForm } = useInspectionForm()
-  const { employee } = useSession()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const machineOptions = useAsync(getMachines, [])
   const machines = machineOptions.data ?? []
   const machineRef = useRef<HTMLSelectElement>(null)
+  const employeeId = user?.login_id ?? (user ? `${user.role === 'admin' ? 'ADM' : 'EMP'}-${String(user.id).padStart(6, '0')}` : '')
+  const employeeName = user?.full_name ?? ''
 
   const [machineId, setMachineId] = useState(initialMachineId ?? '')
   const [defects, setDefects] = useState<FormDefect[]>([
@@ -64,6 +65,15 @@ export default function InspectionFormModal({ initialMachineId }: { initialMachi
     rollId: string
     toWarehouse: number
   } | null>(null)
+
+  // Jobs board passes the numeric machine ID; the select displays the machine code.
+  useEffect(() => {
+    if (!initialMachineId || machines.length === 0) return
+    const machine = machines.find(
+      (candidate) => candidate.id === initialMachineId || String(candidate.machineId) === initialMachineId,
+    )
+    if (machine && machineId !== machine.id) setMachineId(machine.id)
+  }, [initialMachineId, machineId, machines])
 
   useEffect(() => {
     machineRef.current?.focus()
@@ -165,8 +175,8 @@ export default function InspectionFormModal({ initialMachineId }: { initialMachi
       const result = await createInspection({
         jobId: activeJob.jobId,
         machineCode: activeJob.machineId,
-        employeeId: employee.id,
-        inspectorName: employee.name,
+        employeeId,
+        inspectorName: employeeName,
         inspectedAt: today(),
         inspectedQtyMeters: activeJob.producedQtyMeters,
         defects: defects.map((d) => ({
@@ -175,14 +185,6 @@ export default function InspectionFormModal({ initialMachineId }: { initialMachi
           severity: d.severity,
         })),
         remarks: remarks.trim() || undefined,
-      })
-      queueFromInspection({
-        rollId: result.rollId,
-        batchNo: result.batchNo,
-        orderId: result.orderId,
-        machineId: result.machineId,
-        qtyMeters: result.acceptedQtyMeters,
-        packedBy: employee.name,
       })
       setCreated({ id: result.id, rollId: result.rollId, toWarehouse: result.acceptedQtyMeters })
       setDefects([{ type: '', count: '1', severity: 'Medium' }])
@@ -275,9 +277,9 @@ export default function InspectionFormModal({ initialMachineId }: { initialMachi
             <div className="flex items-center justify-between gap-3 rounded-md border border-line bg-panel px-3 py-2">
               <div>
                 <p className="text-xs uppercase tracking-wide muted">Inspector</p>
-                <p className="font-medium text-title">{employee.name}</p>
+                <p className="font-medium text-title">{employeeName || 'Signed-in account unavailable'}</p>
               </div>
-              <span className="text-sm muted">{employee.id}</span>
+              <span className="text-sm muted">{employeeId || 'No employee ID'}</span>
             </div>
 
             <div className="mt-4 flex flex-col gap-1">
@@ -495,7 +497,7 @@ export default function InspectionFormModal({ initialMachineId }: { initialMachi
                 <button type="button" className="text-sm" onClick={closeForm}>
                   Cancel
                 </button>
-                <button type="submit" className="btn-primary" disabled={submitting || !activeJob}>
+                <button type="submit" className="btn-primary" disabled={submitting || !activeJob || !employeeId || !employeeName}>
                   {submitting ? 'Proceeding...' : 'Proceed'}
                 </button>
               </div>

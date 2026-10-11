@@ -162,13 +162,23 @@ def estimate_processing(
     return est
 
 
-def machine_busy_intervals(db: Session, machine: Machine, now: datetime,
-                           horizon_end: datetime) -> tuple[list[dict], list[str]]:
+def machine_busy_intervals(
+    db: Session,
+    machine: Machine,
+    now: datetime,
+    horizon_end: datetime,
+    *,
+    active_job: ProductionJob | None = None,
+    active_job_loaded: bool = False,
+    planned_jobs: list[ProductionJob] | None = None,
+    open_downtime_count: int | None = None,
+    machine_state_loaded: bool = False,
+) -> tuple[list[dict], list[str]]:
     """Committed busy intervals within [now, horizon_end] + warnings."""
     intervals: list[dict] = []
     warnings: list[str] = []
 
-    active = get_active_job(db, machine.id)
+    active = active_job if active_job_loaded else get_active_job(db, machine.id)
     if active is not None:
         remaining = max(0.0, active.planned_quantity - active.actual_quantity)
         est = estimate_processing(machine, remaining, active.quantity_unit, active.required_process)
@@ -182,7 +192,7 @@ def machine_busy_intervals(db: Session, machine: Machine, now: datetime,
             "minutes": round((end - now).total_seconds() / 60.0, 1),
         })
 
-    planned = db.scalars(
+    planned = planned_jobs if machine_state_loaded else db.scalars(
         select(ProductionJob).where(
             ProductionJob.machine_id == machine.id,
             ProductionJob.status == ProductionJobStatus.PLANNED,
@@ -216,15 +226,18 @@ def machine_busy_intervals(db: Session, machine: Machine, now: datetime,
             "minutes": round((end - max(start, now)).total_seconds() / 60.0, 1),
         })
 
-    open_down = db.scalars(
-        select(MachineDowntime).where(
-            MachineDowntime.machine_id == machine.id,
-            MachineDowntime.ended_at.is_(None),
-        )
-    ).all()
-    if open_down:
+    if machine_state_loaded:
+        downtime_count = open_downtime_count or 0
+    else:
+        downtime_count = len(db.scalars(
+            select(MachineDowntime.id).where(
+                MachineDowntime.machine_id == machine.id,
+                MachineDowntime.ended_at.is_(None),
+            )
+        ).all())
+    if downtime_count:
         warnings.append(
-            f"{len(open_down)} open downtime event(s) — end time unknown; excluded from busy intervals "
+            f"{downtime_count} open downtime event(s) — end time unknown; excluded from busy intervals "
             "(assumed resolved; verify before committing)"
         )
     return intervals, warnings
@@ -237,6 +250,11 @@ def compute_schedule(
     unit: str,
     process: str,
     deadline: datetime | None = None,
+    active_job: ProductionJob | None = None,
+    active_job_loaded: bool = False,
+    planned_jobs: list[ProductionJob] | None = None,
+    open_downtime_count: int | None = None,
+    machine_state_loaded: bool = False,
     **estimate_kwargs,
 ) -> ScheduleEstimate:
     now = utcnow()
@@ -250,7 +268,17 @@ def compute_schedule(
     ]
     warnings: list[str] = []
 
-    intervals, iv_warnings = machine_busy_intervals(db, machine, now, horizon_end)
+    intervals, iv_warnings = machine_busy_intervals(
+        db,
+        machine,
+        now,
+        horizon_end,
+        active_job=active_job,
+        active_job_loaded=active_job_loaded,
+        planned_jobs=planned_jobs,
+        open_downtime_count=open_downtime_count,
+        machine_state_loaded=machine_state_loaded,
+    )
     warnings.extend(iv_warnings)
 
     # Only intervals covering `now` delay the earliest start; future committed

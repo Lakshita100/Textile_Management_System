@@ -5,10 +5,12 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Iterator
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session
 
-from app.models import Sequence
+from app.models import PurchaseRequest, Sequence, StockAlert, StockMovement, Supplier
 
 # Stock rules — identical to the frontend rules (one source of truth per tier).
 STATUS_IN_STOCK = "In Stock"
@@ -55,14 +57,51 @@ def next_code(db: Session, sequence_name: str, prefix: str, width: int = 5) -> s
     The counter row is updated inside the caller's transaction so identifiers
     stay unique under concurrency (row lock on PostgreSQL).
     """
-    row = db.get(Sequence, sequence_name, with_for_update=True)
-    if row is None:
-        row = Sequence(name=sequence_name, value=0)
-        db.add(row)
+    # Existing Supabase data may predate id_sequences (or its counter may have
+    # been reset). Seed from the actual IDs before incrementing so the first
+    # request cannot collide with an already-issued identifier.
+    id_columns = {
+        "MOV": StockMovement.movement_id,
+        "ALT": StockAlert.alert_id,
+        "PR": PurchaseRequest.request_id,
+        "SUP": Supplier.supplier_id,
+    }
+    id_column = id_columns.get(prefix)
+    highest_issued = 0
+    if id_column is not None:
+        for identifier in db.scalars(select(id_column).where(id_column.like(f"{prefix}-%"))):
+            try:
+                highest_issued = max(highest_issued, int(identifier.rsplit("-", 1)[1]))
+            except (ValueError, IndexError):
+                continue
+
+    dialect = db.bind.dialect.name if db.bind is not None else ""
+    if dialect == "postgresql":
+        statement = pg_insert(Sequence).values(name=sequence_name, value=highest_issued + 1)
+        statement = statement.on_conflict_do_update(
+            index_elements=[Sequence.name],
+            set_={"value": func.greatest(Sequence.value, highest_issued) + 1},
+        ).returning(Sequence.value)
+    elif dialect == "sqlite":
+        statement = sqlite_insert(Sequence).values(name=sequence_name, value=highest_issued + 1)
+        statement = statement.on_conflict_do_update(
+            index_elements=[Sequence.name],
+            set_={"value": func.max(Sequence.value, highest_issued) + 1},
+        ).returning(Sequence.value)
+    else:
+        row = db.get(Sequence, sequence_name, with_for_update=True)
+        if row is None:
+            row = Sequence(name=sequence_name, value=highest_issued)
+            db.add(row)
+            db.flush()
+        row.value = max(row.value, highest_issued) + 1
         db.flush()
-    row.value += 1
-    db.flush()
-    return f"{prefix}-{row.value:0{width}d}"
+        return f"{prefix}-{row.value:0{width}d}"
+
+    value = db.scalar(statement)
+    if value is None:
+        raise RuntimeError(f"Could not allocate an identifier for sequence {sequence_name}.")
+    return f"{prefix}-{value:0{width}d}"
 
 
 def like_pattern(query: str) -> str:

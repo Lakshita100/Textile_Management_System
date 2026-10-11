@@ -6,7 +6,7 @@ import re
 from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, field_validator
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -21,6 +21,13 @@ def _normalize_email(value: str) -> str:
 NormalizedEmail = Annotated[str, Field(min_length=3, max_length=255), AfterValidator(_normalize_email)]
 
 
+def _validate_full_name(value: str) -> str:
+    name = " ".join(value.split())
+    if len(name.split()) < 2 or not re.fullmatch(r"[^\W\d_][\w'’.-]*(?:\s+[^\W\d_][\w'’.-]*)+", name, re.UNICODE):
+        raise ValueError("Enter your full name, including at least a first and last name.")
+    return name
+
+
 class RegisterIn(BaseModel):
     """Public self-registration is buyer-only; role is never accepted from clients."""
 
@@ -29,6 +36,33 @@ class RegisterIn(BaseModel):
     full_name: str = Field(min_length=1, max_length=120)
     company: str | None = Field(default=None, max_length=120)
     phone: str | None = Field(default=None, max_length=32)
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return _validate_full_name(value)
+
+
+class BuyerProfileUpdateIn(BaseModel):
+    full_name: str = Field(min_length=3, max_length=120)
+    company: str = Field(min_length=1, max_length=120)
+    phone: str = Field(min_length=12, max_length=20)
+    address: str = Field(min_length=1, max_length=255)
+    city: str = Field(min_length=1, max_length=120)
+    country: str = Field(min_length=1, max_length=120)
+    postal_code: str = Field(min_length=1, max_length=32)
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        return _validate_full_name(value)
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        if not re.fullmatch(r"\+\d{1,4}\s\d{10}", value.strip()):
+            raise ValueError("Enter a country calling code and a 10-digit phone number.")
+        return value.strip()
 
 
 class LoginIn(BaseModel):
@@ -65,6 +99,10 @@ class UserOut(BaseModel):
     role: str
     company: str | None = None
     phone: str | None = None
+    address: str | None = None
+    city: str | None = None
+    country: str | None = None
+    postal_code: str | None = None
     is_active: bool = True
     permissions: list[str] = Field(default_factory=list)
     must_change_password: bool = False

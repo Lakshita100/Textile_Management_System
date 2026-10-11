@@ -24,6 +24,8 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.machine import Machine
+from app.models.fulfillment import PackingLot
+from app.models.order import BuyerOrder
 from app.models.production import MachineDowntime, ProductionJob, ProductionJobStatus
 from app.models.quality import InspectionOutcome, QualityInspection
 from app.schemas.quality import InspectionCreate, InspectionUpdate
@@ -126,6 +128,29 @@ def create_inspection(db: Session, payload: InspectionCreate) -> QualityInspecti
         source="session-entry",
     )
     db.add(inspection)
+    db.flush()
+    order = db.get(BuyerOrder, job.order_ref)
+    if accepted > 0 and order is not None:
+        db.add(PackingLot(
+            id=f"PK-{inspection.id:08d}", inspection_id=inspection.id,
+            order_id=job.order_ref, roll_id=roll_id, batch_no=derived_batch,
+            machine_code=machine.code, quality_outcome=outcome.value,
+            quantity_meters=accepted, status="Pending packing",
+        ))
+    if order is not None:
+        timestamp = datetime.now().astimezone().isoformat()
+        note = f"Production output was inspected on {machine.code}; accepted quantity: {accepted:g} m."
+        order_jobs = db.scalars(select(ProductionJob).where(ProductionJob.order_ref == order.id)).all()
+        production_complete = bool(order_jobs) and all(
+            item.status in {ProductionJobStatus.COMPLETED, ProductionJobStatus.CANCELLED}
+            for item in order_jobs
+        )
+        next_status = "Quality Check" if production_complete else "In Production"
+        if order.status != next_status:
+            order.status = next_status
+            order.status_history = [*(order.status_history or []), {"status": next_status, "note": note, "timestamp": timestamp}]
+        order.updated_at = datetime.now().replace(tzinfo=None)
+        order.buyer_visible_updates = [*(order.buyer_visible_updates or []), {"sender": "admin", "message": note, "timestamp": timestamp}]
     db.commit()
     db.refresh(inspection)
     return inspection

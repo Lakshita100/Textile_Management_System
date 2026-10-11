@@ -1,4 +1,4 @@
-"""Database session and engine configuration with automatic SQLite fallback."""
+"""Database session and engine configuration for the configured database."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ class Base(DeclarativeBase):
 
 
 def _build_engine(url: str) -> Engine:
-    """Create the engine with engine-specific connection options and DLL/driver fallback."""
+    """Create and verify the configured database engine; never silently fork data."""
     connect_args: dict = {}
     extra_kwargs: dict = {}
     if url.startswith("sqlite"):
@@ -46,17 +46,11 @@ def _build_engine(url: str) -> Engine:
         logger.info(f"Successfully initialized DB engine: {url.split('@')[-1] if '@' in url else url}")
         return engine
     except Exception as e:
-        logger.warning(
-            f"Database engine creation failed for primary URL ({e}). Falling back to local SQLite 'sqlite:///./textile_dev.db'"
-        )
-        sqlite_url = "sqlite:///./textile_dev.db"
-        sqlite_engine = create_engine(
-            sqlite_url,
-            echo=False,
-            future=True,
-            connect_args={"timeout": 30, "check_same_thread": False},
-        )
-        return sqlite_engine
+        logger.exception("Could not connect to the configured database; refusing to use a separate local database.")
+        raise RuntimeError(
+            "Could not connect to DATABASE_URL. Check the Supabase connection string and network access. "
+            "No local SQLite fallback was opened."
+        ) from e
 
 
 engine = _build_engine(settings.DATABASE_URL)

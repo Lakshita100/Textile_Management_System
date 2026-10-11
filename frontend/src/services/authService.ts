@@ -15,6 +15,10 @@ export interface AuthUser {
   role: AuthRole;
   company: string | null;
   phone: string | null;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  postal_code: string | null;
   is_active: boolean;
   permissions: string[];
   must_change_password: boolean;
@@ -66,6 +70,45 @@ export interface ProvisionedEmployee {
 export interface EmployeeUpdateInput {
   permissions?: string[];
   is_active?: boolean;
+}
+
+export interface BuyerProfileUpdateInput {
+  full_name: string;
+  company: string;
+  phone: string;
+  address: string;
+  city: string;
+  country: string;
+  postal_code: string;
+}
+
+export interface BuyerYarnCatalogItem {
+  yarnId: string;
+  yarnName: string;
+  productCode: string;
+  category: string;
+  materialComposition: string;
+  denierSpecification: string;
+  colourShade: string;
+  unit: string;
+}
+
+export interface BuyerFabricCatalogItem {
+  recipeCode: string;
+  fabricName: string;
+  fabricCategory: string;
+  construction: string;
+  finishedWeightKg: number;
+  expectedWastePercent: number;
+  ingredients: Array<{
+    lineNo: number;
+    yarnId: string | null;
+    yarnRole: string;
+    yarnType: string;
+    specification: string;
+    quantityKg: number;
+    wastePercent: number;
+  }>;
 }
 
 const TOKEN_KEY = 'everest-auth-token';
@@ -133,6 +176,18 @@ export async function resetEmployeePassword(id: number): Promise<ProvisionedEmpl
 
 export async function fetchCurrentUser(): Promise<AuthUser> {
   return http.get<AuthUser>('/auth/me', { headers: authHeaders() });
+}
+
+export async function updateBuyerProfile(input: BuyerProfileUpdateInput): Promise<AuthUser> {
+  return http.patch<AuthUser>('/auth/profile', input, { headers: authHeaders() });
+}
+
+export async function getBuyerYarnCatalog(): Promise<BuyerYarnCatalogItem[]> {
+  return http.get<BuyerYarnCatalogItem[]>('/auth/catalog/yarn', { headers: authHeaders() });
+}
+
+export async function getBuyerFabricCatalog(): Promise<BuyerFabricCatalogItem[]> {
+  return http.get<BuyerFabricCatalogItem[]>('/auth/catalog/fabric', { headers: authHeaders() });
 }
 
 export async function signOut(): Promise<void> {

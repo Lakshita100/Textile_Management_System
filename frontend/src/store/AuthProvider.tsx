@@ -10,9 +10,10 @@ import {
   signInWithGoogle as signInWithGoogleRequest,
   signOut as signOutRequest,
   storeToken,
+  updateBuyerProfile as updateBuyerProfileRequest,
 } from '../services/authService';
-import type { RegisterInput } from '../services/authService';
-import { setCurrentSession, syncAuthenticatedBuyer } from '../services/orderService';
+import type { BuyerProfileUpdateInput, RegisterInput } from '../services/authService';
+import { clearBuyerWorkspace, hydrateBuyerWorkspace, setCurrentSession, syncAuthenticatedBuyer } from '../services/orderService';
 
 /**
  * The buyer/admin portals still read their workspace session from
@@ -22,6 +23,7 @@ import { setCurrentSession, syncAuthenticatedBuyer } from '../services/orderServ
 function syncPortalSession(user: AuthUser | null): void {
   if (!user) {
     setCurrentSession(null);
+    clearBuyerWorkspace();
     return;
   }
   if (user.role !== 'buyer' && user.role !== 'admin') {
@@ -46,6 +48,7 @@ export interface AuthContextValue {
   signIn: (identifier: string, password: string) => Promise<AuthUser>;
   signInWithGoogle: (idToken: string) => Promise<AuthUser>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<AuthUser>;
+  updateBuyerProfile: (input: BuyerProfileUpdateInput) => Promise<AuthUser>;
   register: (input: RegisterInput) => Promise<AuthUser>;
   signOut: () => Promise<void>;
   hasRole: (...roles: AuthRole[]) => boolean;
@@ -66,10 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     fetchCurrentUser()
-      .then((me) => {
+      .then(async (me) => {
         if (!cancelled) {
           syncPortalSession(me);
           setUser(me);
+        }
+        if (me.role === 'buyer' || me.role === 'admin') {
+          await hydrateBuyerWorkspace().catch(() => undefined);
         }
       })
       .catch(() => {
@@ -92,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = await signInRequest(identifier, password);
     storeToken(session.token);
     syncPortalSession(session.user);
+    if (session.user.role === 'buyer' || session.user.role === 'admin') await hydrateBuyerWorkspace();
     setUser(session.user);
     return session.user;
   }, []);
@@ -100,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = await signInWithGoogleRequest(idToken);
     storeToken(session.token);
     syncPortalSession(session.user);
+    if (session.user.role === 'buyer' || session.user.role === 'admin') await hydrateBuyerWorkspace();
     setUser(session.user);
     return session.user;
   }, []);
@@ -111,10 +119,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return updated;
   }, []);
 
+  const updateBuyerProfile = useCallback(async (input: BuyerProfileUpdateInput) => {
+    const updated = await updateBuyerProfileRequest(input);
+    syncPortalSession(updated);
+    setUser(updated);
+    return updated;
+  }, []);
+
   const register = useCallback(async (input: RegisterInput) => {
     const session = await registerAccount(input);
     storeToken(session.token);
     syncPortalSession(session.user);
+    if (session.user.role === 'buyer' || session.user.role === 'admin') await hydrateBuyerWorkspace();
     setUser(session.user);
     return session.user;
   }, []);
@@ -135,8 +151,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, signIn, signInWithGoogle, changePassword, register, signOut, hasRole, hasPermission }),
-    [user, loading, signIn, signInWithGoogle, changePassword, register, signOut, hasRole, hasPermission],
+    () => ({ user, loading, signIn, signInWithGoogle, changePassword, updateBuyerProfile, register, signOut, hasRole, hasPermission }),
+    [user, loading, signIn, signInWithGoogle, changePassword, updateBuyerProfile, register, signOut, hasRole, hasPermission],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

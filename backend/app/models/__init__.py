@@ -4,6 +4,9 @@ from app.models.alert import StockAlert
 from app.models.auth import AttendanceRecord, User, UserRole
 from app.models.machine import Machine, MachineStatus, MachineStatusEvent
 from app.models.movement import StockMovement
+from app.models.inquiry import BuyerInquiry
+from app.models.fulfillment import PackingLot, Shipment
+from app.models.order import BuyerOrder, FabricRecipe, FabricRecipeIngredient
 from app.models.production import (
     MachineDowntime,
     ProductionJob,
@@ -33,6 +36,12 @@ __all__ = [
     "SupplierProductCode",
     "SupplierChangeHistory",
     "StockMovement",
+    "BuyerInquiry",
+    "PackingLot",
+    "Shipment",
+    "BuyerOrder",
+    "FabricRecipe",
+    "FabricRecipeIngredient",
     "StockAlert",
     "PurchaseRequest",
     "Machine",

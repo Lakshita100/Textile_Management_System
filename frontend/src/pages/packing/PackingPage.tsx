@@ -5,11 +5,12 @@ import StatusBadge from '../../components/ui/StatusBadge'
 import { packStatusTone } from '../../components/ui/badgeTone'
 import { EmptyState, ErrorState, LoadingState } from '../../components/ui/StateViews'
 import { useAsync } from '../../hooks/useAsync'
-import { getPackingBundle } from '../../services/packingService'
+import { getPackingBundle, updatePackingLot } from '../../services/packingService'
 import type { PackStatus } from '../../types/packing'
 
 const STATUS_FILTERS: Array<{ label: string; value: PackStatus | undefined }> = [
   { label: 'All', value: undefined },
+  { label: 'Pending packing', value: 'Pending packing' },
   { label: 'Packed', value: 'Packed' },
   { label: 'In warehouse', value: 'In warehouse' },
   { label: 'Dispatched', value: 'Dispatched' },
@@ -18,11 +19,27 @@ const STATUS_FILTERS: Array<{ label: string; value: PackStatus | undefined }> = 
 export default function PackingPage() {
   const [status, setStatus] = useState<PackStatus | undefined>(undefined)
   const bundle = useAsync(() => getPackingBundle(status), [status])
+  const [actionError, setActionError] = useState('')
+  const [busyLot, setBusyLot] = useState('')
   const b = bundle.data
+
+  async function advanceLot(id: string, next: 'Packed' | 'In warehouse') {
+    setBusyLot(id)
+    setActionError('')
+    try {
+      await updatePackingLot(id, next)
+      bundle.reload()
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Could not update this packing lot.')
+    } finally {
+      setBusyLot('')
+    }
+  }
 
   return (
     <div>
       <PageHeader title="Packing" />
+      {actionError ? <div className="card mb-4 p-3 text-sm text-title" role="alert">{actionError}</div> : null}
 
       {bundle.loading ? (
         <LoadingState label="Loading packing data..." />
@@ -84,6 +101,7 @@ export default function PackingPage() {
                       <th className="table-header px-4 py-2 text-left">Packed at</th>
                       <th className="table-header px-4 py-2 text-left">Packed by</th>
                       <th className="table-header px-4 py-2 text-left">Status</th>
+                      <th className="table-header px-4 py-2 text-left">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -101,6 +119,17 @@ export default function PackingPage() {
                         <td className="px-4 py-2">{lot.packedBy}</td>
                         <td className="px-4 py-2">
                           <StatusBadge label={lot.status} tone={packStatusTone(lot.status)} />
+                        </td>
+                        <td className="px-4 py-2">
+                          {lot.status === 'Pending packing' ? (
+                            <button className="btn-primary px-2 py-1 text-xs" disabled={busyLot === lot.id} onClick={() => void advanceLot(lot.id, 'Packed')}>
+                              {busyLot === lot.id ? 'Saving…' : 'Mark packed'}
+                            </button>
+                          ) : lot.status === 'Packed' ? (
+                            <button className="btn-secondary px-2 py-1 text-xs" disabled={busyLot === lot.id} onClick={() => void advanceLot(lot.id, 'In warehouse')}>
+                              {busyLot === lot.id ? 'Saving…' : 'Move to warehouse'}
+                            </button>
+                          ) : <span className="text-xs muted">—</span>}
                         </td>
                       </tr>
                     ))}

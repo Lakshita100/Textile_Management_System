@@ -12,6 +12,8 @@ export interface Shipment {
   dispatchDate: string
   status: ShipmentStatus
   courier: string
+  trackingNumber?: string | null
+  destination?: string | null
 }
 
 export interface DispatchStatRow {

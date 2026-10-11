@@ -13,18 +13,18 @@ Never silently perfect.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.adapters import OrderInfo, inventory_adapter, orders_adapter
 from app.config import settings
 from app.models.machine import Machine, MachineStatus
-from app.models.production import ProductionJob, ProductionJobStatus
-from app.services.machines import completed_jobs_efficiency_percent, get_active_job
+from app.models.production import MachineDowntime, ProductionJob, ProductionJobStatus
+from app.models.quality import QualityInspection
 from app.services.production import detect_schedule_conflict
-from app.services import allocation_ml, scheduling, quality as quality_service
+from app.services import allocation_ml, scheduling
 
 ACTIVE_STATUSES = (ProductionJobStatus.IN_PROGRESS, ProductionJobStatus.PAUSED)
 
@@ -75,6 +75,8 @@ def rank_machines(
     required_quantity: float,
     deadline: datetime | None,
     quantity_unit: str = "meters",
+    material_verified: bool | None = None,
+    material_note: str | None = None,
 ) -> tuple[list[Candidate], list[str], bool | None, str]:
     """Core ranking. Returns (candidates sorted by score desc, global_warnings, material_ok, material_note)."""
     warnings: list[str] = []
@@ -82,8 +84,11 @@ def rank_machines(
     material = required_material.strip().upper()
 
     # --- Material availability (hard gate) — Maahi adapter ---
-    avail = inventory_adapter.get_availability(material)
-    if avail is None:
+    avail = inventory_adapter.get_availability(material) if material_verified is None else None
+    if material_verified is not None:
+        material_ok = material_verified
+        material_note = material_note or f"Material '{material}' verified against live inventory."
+    elif avail is None:
         material_ok = None
         material_note = f"Material availability for '{material}' UNKNOWN (inventory contract pending) — cannot verify sufficiency"
         warnings.append(material_note)
@@ -106,6 +111,85 @@ def rank_machines(
     now = datetime.now(timezone.utc)
     candidates: list[Candidate] = []
     machines = db.scalars(select(Machine)).all()
+    machine_ids = [
+        machine.id
+        for machine in machines
+        if process in machine.process_list
+        and (not machine.material_list or material in machine.material_list)
+        and machine.status != MachineStatus.MAINTENANCE
+        and machine.capacity_value > 0
+    ]
+    active_by_machine: dict[int, ProductionJob] = {}
+    planned_by_machine: dict[int, list[ProductionJob]] = {}
+    efficiency_by_machine: dict[int, float] = {}
+    quality_by_machine: dict[int, tuple[int, int]] = {}
+    open_downtime_by_machine: dict[int, int] = {}
+    if machine_ids:
+        # Batch the DB-backed ranking features. The former per-machine lookups
+        # multiplied Supabase round trips by each compatible machine and once
+        # per process step in an order route.
+        for active_job in db.scalars(
+            select(ProductionJob)
+            .where(
+                ProductionJob.machine_id.in_(machine_ids),
+                ProductionJob.status.in_(ACTIVE_STATUSES),
+            )
+            .order_by(ProductionJob.created_at.desc())
+        ).all():
+            active_by_machine.setdefault(active_job.machine_id, active_job)
+
+        for planned_job in db.scalars(
+            select(ProductionJob).where(
+                ProductionJob.machine_id.in_(machine_ids),
+                ProductionJob.status == ProductionJobStatus.PLANNED,
+            )
+        ).all():
+            planned_by_machine.setdefault(planned_job.machine_id, []).append(planned_job)
+
+        downtime_rows = db.execute(
+            select(MachineDowntime.machine_id, func.count(MachineDowntime.id))
+            .where(
+                MachineDowntime.machine_id.in_(machine_ids),
+                MachineDowntime.ended_at.is_(None),
+            )
+            .group_by(MachineDowntime.machine_id)
+        ).all()
+        open_downtime_by_machine = {machine_id: int(count) for machine_id, count in downtime_rows}
+
+        completion_ratio = case(
+            (
+                ProductionJob.planned_quantity > 0,
+                case(
+                    (ProductionJob.actual_quantity >= ProductionJob.planned_quantity, 1.0),
+                    else_=ProductionJob.actual_quantity / ProductionJob.planned_quantity,
+                ),
+            ),
+            else_=0.0,
+        )
+        efficiencies = db.execute(
+            select(ProductionJob.machine_id, func.avg(completion_ratio))
+            .where(
+                ProductionJob.machine_id.in_(machine_ids),
+                ProductionJob.status == ProductionJobStatus.COMPLETED,
+                ProductionJob.updated_at >= now - timedelta(days=90),
+            )
+            .group_by(ProductionJob.machine_id)
+        ).all()
+        efficiency_by_machine = {machine_id: round(float(ratio) * 100.0, 2) for machine_id, ratio in efficiencies}
+
+        quality_rows = db.execute(
+            select(
+                QualityInspection.machine_id,
+                func.count(QualityInspection.id),
+                func.sum(case((QualityInspection.outcome == "Approved", 1), else_=0)),
+            )
+            .where(QualityInspection.machine_id.in_(machine_ids))
+            .group_by(QualityInspection.machine_id)
+        ).all()
+        quality_by_machine = {
+            machine_id: (int(count), int(approved or 0))
+            for machine_id, count, approved in quality_rows
+        }
 
     for machine in machines:
         c = Candidate(machine=machine, eligible=True)
@@ -136,7 +220,7 @@ def rank_machines(
 
         # Schedule/assignment gates + workload
         committed_days = 0.0
-        active = get_active_job(db, machine.id)
+        active = active_by_machine.get(machine.id)
         if c.eligible and active is not None and deadline is None:
             c.eligible = False
             c.exclusion_reasons.append(f"Committed to active job #{active.id} and no deadline given to plan around it")
@@ -170,7 +254,7 @@ def rank_machines(
             continue
 
         # --- Efficiency (documented measure; unknown → neutral + warning) ---
-        eff = completed_jobs_efficiency_percent(db, machine.id)
+        eff = efficiency_by_machine.get(machine.id)
         c.efficiency = eff
         c.efficiency_known = eff is not None
         if eff is None:
@@ -178,7 +262,15 @@ def rank_machines(
             c.warnings.append("No completed-job history — efficiency unknown; neutral fallback applied")
 
         # --- Quality (persisted inspections; unknown/insufficient -> neutral + warning) ---
-        rate, sample_count, q_note = quality_service.machine_quality_summary(db, machine.id)
+        sample_count, approved_count = quality_by_machine.get(machine.id, (0, 0))
+        if sample_count >= settings.REC_MIN_QUALITY_SAMPLES:
+            rate = round(100.0 * approved_count / sample_count, 2)
+            q_note = f"pass rate {rate}% over {sample_count} persisted inspection(s)"
+        else:
+            rate = None
+            q_note = "no persisted inspection history" if sample_count == 0 else (
+                f"only {sample_count} inspection(s), minimum {settings.REC_MIN_QUALITY_SAMPLES} required"
+            )
         c.quality = rate
         c.quality_known = rate is not None
         if rate is None:
@@ -197,7 +289,17 @@ def rank_machines(
 
         # --- Scheduling estimate (Phase D): feasible start/completion, idle, deadline ---
         c.schedule = scheduling.compute_schedule(
-            db, machine, required_quantity, quantity_unit, process, deadline
+            db,
+            machine,
+            required_quantity,
+            quantity_unit,
+            process,
+            deadline,
+            active_job=active,
+            active_job_loaded=True,
+            planned_jobs=planned_by_machine.get(machine.id, []),
+            open_downtime_count=open_downtime_by_machine.get(machine.id, 0),
+            machine_state_loaded=True,
         )
 
         # --- Experimental ML allocation probability (Phase C) — never overrides score/constraints ---

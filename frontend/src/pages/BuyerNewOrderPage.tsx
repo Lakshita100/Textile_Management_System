@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck } from 'lucide-react'
 import { buttonClass } from '../components/ui/Button'
-import { createOrderForBuyer, getBuyerById, getCurrentSession } from '../services/orderService'
+import { getBuyerById, getCurrentSession, submitBuyerOrder } from '../services/orderService'
+import { isFullContactName } from '../services/locationService'
+import { getBuyerFabricCatalog, getBuyerYarnCatalog } from '../services/authService'
+import type { BuyerFabricCatalogItem, BuyerYarnCatalogItem } from '../services/authService'
 
 type OrderForm = {
   productCategory: string
@@ -10,6 +13,7 @@ type OrderForm = {
   yarnType: string
   yarnSubtype: string
   productCode: string
+  yarnId: string
   materialComposition: string
   technicalSpecifications: string
   denierCount: string
@@ -41,6 +45,7 @@ export default function BuyerNewOrderPage() {
     yarnType: '',
     yarnSubtype: '',
     productCode: '',
+    yarnId: '',
     materialComposition: '',
     technicalSpecifications: '',
     denierCount: '',
@@ -56,6 +61,39 @@ export default function BuyerNewOrderPage() {
     buyerNotes: '',
   })
 
+  const [yarnCatalog, setYarnCatalog] = useState<BuyerYarnCatalogItem[]>([])
+  const [fabricCatalog, setFabricCatalog] = useState<BuyerFabricCatalogItem[]>([])
+  const [catalogError, setCatalogError] = useState('')
+  const [catalogLoading, setCatalogLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    Promise.all([getBuyerYarnCatalog(), getBuyerFabricCatalog()])
+      .then(([yarns, fabrics]) => {
+        if (active) {
+          setYarnCatalog(yarns)
+          setFabricCatalog(fabrics)
+        }
+      })
+      .catch((error: unknown) => {
+        if (active) setCatalogError(error instanceof Error ? error.message : 'Could not load the product catalog.')
+      })
+      .finally(() => { if (active) setCatalogLoading(false) })
+    return () => { active = false }
+  }, [])
+
+  const yarnTypes = useMemo(() => [...new Set(yarnCatalog.map((item) => item.category))].sort(), [yarnCatalog])
+  const yarnSubtypes = useMemo(() => [...new Set(yarnCatalog
+    .filter((item) => !form.yarnType || item.category === form.yarnType)
+    .map((item) => `${item.materialComposition} · ${item.denierSpecification}`))].sort(), [form.yarnType, yarnCatalog])
+  const matchingYarns = useMemo(() => yarnCatalog.filter((item) =>
+    (!form.yarnType || item.category === form.yarnType)
+    && (!form.yarnSubtype || `${item.materialComposition} · ${item.denierSpecification}` === form.yarnSubtype),
+  ), [form.yarnSubtype, form.yarnType, yarnCatalog])
+  const matchingFabrics = useMemo(() => fabricCatalog.filter((item) =>
+    !form.yarnType || item.fabricCategory === form.yarnType,
+  ), [fabricCatalog, form.yarnType])
+
   const setField = <K extends keyof OrderForm>(field: K, value: OrderForm[K]) => {
     setForm((current) => ({ ...current, [field]: value }))
   }
@@ -67,8 +105,12 @@ export default function BuyerNewOrderPage() {
       setError('Your buyer session has expired. Please sign in again before placing an order.')
       return
     }
-    if (!buyer?.companyName || !buyer.contactName || !buyer.email || !buyer.phone) {
-      setError('Complete your buyer contact details in Profile & Settings before submitting an order.')
+    if (!buyer?.companyName.trim() || !isFullContactName(buyer.contactName) || !buyer.email.trim() || !/^\+\d{1,4}\s\d{10}$/.test(buyer.phone) || !buyer.address.trim() || !buyer.city.trim() || !buyer.country.trim() || !buyer.postalCode?.trim()) {
+      setError('Your buyer details are incomplete. Fill in your contact and delivery information before placing an order.')
+      return
+    }
+    if (form.productCategory === 'Yarn' && !form.yarnId) {
+      setError('Select an available yarn product from the inventory catalog.')
       return
     }
     if (Number(form.quantity) <= 0) {
@@ -78,15 +120,15 @@ export default function BuyerNewOrderPage() {
     setStep('review')
   }
 
-  const submitOrder = () => {
+  const submitOrder = async () => {
     if (submitting || !session || session.role !== 'buyer') return
     setSubmitting(true)
     setError('')
     try {
-      const order = createOrderForBuyer(session.userId, {
-        source: 'Buyer Portal',
+      const order = await submitBuyerOrder({
         productName: form.productName.trim(),
         productCode: form.productCode.trim() || 'Not provided',
+        ...(form.yarnId ? { yarnId: form.yarnId } : {}),
         productCategory: form.productCategory,
         yarnType: form.yarnType,
         yarnSubtype: form.yarnSubtype.trim(),
@@ -197,19 +239,71 @@ export default function BuyerNewOrderPage() {
             <h2 className="text-lg font-semibold text-ink">Product requirements</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <Field label="Product category" required>
-                <select required value={form.productCategory} onChange={(event) => setField('productCategory', event.target.value)} className={inputClass}>
+                <select required value={form.productCategory} onChange={(event) => setForm((current) => ({ ...current, productCategory: event.target.value, unit: event.target.value === 'Fabric' ? 'kg' : current.unit, productName: '', yarnId: '', productCode: '', yarnType: '', yarnSubtype: '', materialComposition: '', denierCount: '', shade: '' }))} className={inputClass}>
                   <option value="">Select a category</option><option>Yarn</option><option>Fabric</option><option>Garment / made-up</option><option>Other textile</option>
                 </select>
               </Field>
-              <Field label="Product name" required><input required value={form.productName} onChange={(event) => setField('productName', event.target.value)} className={inputClass} placeholder="e.g. Combed cotton yarn" /></Field>
-              <Field label="Yarn type" required>
-                <select required value={form.yarnType} onChange={(event) => setField('yarnType', event.target.value)} className={inputClass}>
-                  <option value="">Select yarn type</option><option>Cotton</option><option>Polyester</option><option>Blended</option><option>Denim</option><option>Other</option>
-                </select>
-              </Field>
-              <Field label="Yarn subtype"><input value={form.yarnSubtype} onChange={(event) => setField('yarnSubtype', event.target.value)} className={inputClass} placeholder="e.g. Combed, ring-spun" /></Field>
-              <Field label="Product code (if available)"><input value={form.productCode} onChange={(event) => setField('productCode', event.target.value)} className={inputClass} /></Field>
-              <Field label="Material composition" required><input required value={form.materialComposition} onChange={(event) => setField('materialComposition', event.target.value)} className={inputClass} placeholder="e.g. 100% organic cotton" /></Field>
+              {form.productCategory === 'Yarn' ? <>
+                <Field label="Yarn type" required>
+                  <select required value={form.yarnType} onChange={(event) => setForm((current) => ({ ...current, yarnType: event.target.value, yarnSubtype: '', yarnId: '', productName: '', productCode: '', materialComposition: '', denierCount: '', shade: '' }))} className={inputClass}>
+                    <option value="">{catalogLoading ? 'Loading yarn types…' : 'Select yarn type'}</option>
+                    {yarnTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                  </select>
+                </Field>
+                <Field label="Yarn subtype / composition" required>
+                  <select required value={form.yarnSubtype} onChange={(event) => setForm((current) => ({ ...current, yarnSubtype: event.target.value, yarnId: '', productName: '', productCode: '' }))} className={inputClass}>
+                    <option value="">Select a valid type and composition</option>
+                    {yarnSubtypes.map((subtype) => <option key={subtype} value={subtype}>{subtype}</option>)}
+                  </select>
+                </Field>
+                <Field label="Product name" required>
+                  <select required value={form.yarnId} onChange={(event) => {
+                    const item = yarnCatalog.find((candidate) => candidate.yarnId === event.target.value)
+                    setForm((current) => ({
+                      ...current,
+                      yarnId: item?.yarnId ?? '',
+                      productName: item?.yarnName ?? '',
+                      productCode: item?.productCode ?? '',
+                      yarnType: item?.category ?? current.yarnType,
+                      yarnSubtype: item ? `${item.materialComposition} · ${item.denierSpecification}` : current.yarnSubtype,
+                      materialComposition: item?.materialComposition ?? '',
+                      denierCount: item?.denierSpecification ?? '',
+                      shade: item?.colourShade ?? '',
+                      unit: item?.unit.toLowerCase().includes('meter') ? 'metres' : 'kg',
+                    }))
+                  }} className={inputClass}>
+                    <option value="">{!form.yarnType || !form.yarnSubtype ? 'Choose yarn type and subtype first' : 'Select product'}</option>
+                    {matchingYarns.map((item) => <option key={item.yarnId} value={item.yarnId}>{item.yarnName} ({item.productCode})</option>)}
+                  </select>
+                </Field>
+                {catalogError ? <p role="alert" className="sm:col-span-2 rounded-lg bg-error/5 p-3 text-sm text-error">{catalogError}</p> : null}
+                {!catalogLoading && !yarnCatalog.length ? <p className="sm:col-span-2 text-sm text-muted">No yarn products are currently listed in inventory.</p> : null}
+              </> : form.productCategory === 'Fabric' ? <>
+                <Field label="Fabric category" required>
+                  <select required value={form.yarnType} onChange={(event) => setForm((current) => ({ ...current, yarnType: event.target.value, productName: '', productCode: '', materialComposition: '', technicalSpecifications: '' }))} className={inputClass}>
+                    <option value="">{catalogLoading ? 'Loading fabric categories…' : 'Select a fabric category'}</option>
+                    {[...new Set(fabricCatalog.map((item) => item.fabricCategory))].sort().map((category) => <option key={category}>{category}</option>)}
+                  </select>
+                </Field>
+                <Field label="Fabric product" required>
+                  <select required value={form.productCode} onChange={(event) => {
+                    const item = fabricCatalog.find((candidate) => candidate.recipeCode === event.target.value)
+                    setForm((current) => ({
+                      ...current,
+                      productName: item?.fabricName ?? '',
+                      productCode: item?.recipeCode ?? '',
+                      materialComposition: item?.ingredients.map((ingredient) => `${ingredient.yarnType} ${ingredient.specification}`).join(' + ') ?? '',
+                      technicalSpecifications: item?.construction ?? '',
+                    }))
+                  }} className={inputClass}>
+                    <option value="">Select a fabric recipe</option>
+                    {matchingFabrics.map((item) => <option key={item.recipeCode} value={item.recipeCode}>{item.fabricName} ({item.recipeCode})</option>)}
+                  </select>
+                </Field>
+                {!catalogLoading && !fabricCatalog.length ? <p className="sm:col-span-2 text-sm text-muted">No active fabric recipes are listed in inventory.</p> : null}
+              </> : <Field label="Product name" required><input required value={form.productName} onChange={(event) => setField('productName', event.target.value)} className={inputClass} placeholder="Enter requested product" /></Field>}
+              {form.productCategory !== 'Yarn' && form.productCategory !== 'Fabric' ? <Field label="Product code (if available)"><input value={form.productCode} onChange={(event) => setField('productCode', event.target.value)} className={inputClass} /></Field> : null}
+              {form.productCategory !== 'Fabric' ? <Field label="Material composition" required><input required value={form.materialComposition} onChange={(event) => setField('materialComposition', event.target.value)} className={inputClass} placeholder="e.g. 100% organic cotton" /></Field> : null}
               <Field label="Denier / count (if applicable)"><input value={form.denierCount} onChange={(event) => setField('denierCount', event.target.value)} className={inputClass} placeholder="e.g. 30s Ne / 150D" /></Field>
               <Field label="Colour / shade" required><input required value={form.shade} onChange={(event) => setField('shade', event.target.value)} className={inputClass} placeholder="Name or shade reference" /></Field>
               <Field label="Technical specifications" className="sm:col-span-2"><textarea value={form.technicalSpecifications} onChange={(event) => setField('technicalSpecifications', event.target.value)} rows={3} className={`${inputClass} h-auto py-2`} placeholder="Twist, finish, tolerances, construction or other specifications" /></Field>
@@ -221,7 +315,7 @@ export default function BuyerNewOrderPage() {
             <h2 className="text-lg font-semibold text-ink">Quantity & delivery</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <Field label="Required quantity" required><input required type="number" min="0.01" step="any" value={form.quantity} onChange={(event) => setField('quantity', event.target.value)} className={inputClass} /></Field>
-              <Field label="Unit" required><select value={form.unit} onChange={(event) => setField('unit', event.target.value as OrderForm['unit'])} className={inputClass}><option value="kg">kg</option><option value="metres">metres</option></select></Field>
+              <Field label="Unit" required><select value={form.unit} onChange={(event) => setField('unit', event.target.value as OrderForm['unit'])} className={inputClass}><option value="kg">kg</option><option value="metres" disabled={form.productCategory === 'Fabric'}>metres</option></select>{form.productCategory === 'Fabric' ? <span className="mt-1 block text-xs text-muted">Fabric recipe ingredients are defined in kg, so this order is measured in kg.</span> : null}</Field>
               <Field label="Order priority"><select value={form.priority} onChange={(event) => setField('priority', event.target.value as OrderForm['priority'])} className={inputClass}><option>Standard</option><option>Urgent</option><option>Flexible</option></select></Field>
               <Field label="Requested delivery date" required><input required type="date" min={earliestDeliveryDate} value={form.requestedDeliveryDate} onChange={(event) => setField('requestedDeliveryDate', event.target.value)} className={inputClass} /></Field>
               <Field label="Delivery address" required className="sm:col-span-2"><textarea required rows={2} value={form.deliveryAddress} onChange={(event) => setField('deliveryAddress', event.target.value)} className={`${inputClass} h-auto py-2`} /></Field>
@@ -238,7 +332,7 @@ export default function BuyerNewOrderPage() {
             <p className="mt-3 text-xs text-muted">File attachments are not supported by this local demo. Add colour-reference or specification details in the notes above.</p>
           </section>
 
-          {error ? <p role="alert" className="rounded-xl border border-error/40 bg-error/5 p-3 text-sm font-medium text-error">{error}</p> : null}
+          {error ? <div role="alert" className="rounded-xl border border-error/40 bg-error/5 p-3 text-sm font-medium text-error"><p>{error}</p>{error.includes('buyer details') ? <Link to="/buyer/profile" className="mt-2 inline-block font-semibold underline">Complete buyer details</Link> : null}</div> : null}
           <div className="flex justify-end">
             <button type="submit" className={buttonClass('primary', 'md')}>Review order <ArrowRight className="h-4 w-4" /></button>
           </div>

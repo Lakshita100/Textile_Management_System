@@ -30,7 +30,12 @@ import {
   getOrderById,
   getOrdersForBuyer,
   updateBuyerProfile,
+  getBuyerById,
 } from '../services/orderService'
+import { findCityByPostalCode, getCountries, isFullContactName, splitPhoneNumber } from '../services/locationService'
+import type { CountryOption } from '../services/locationService'
+import { http } from '../services/http'
+import type { OrderRecord } from '../services/orderService'
 
 const navItems = [
   { to: '/buyer', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -71,6 +76,8 @@ export function BuyerRouteGuard() {
 
 export function BuyerPortalLayout() {
   const session = getCurrentSession()
+  const profile = session ? getBuyerById(session.userId) : undefined
+  const profileComplete = Boolean(profile?.companyName.trim() && isFullContactName(profile.contactName) && profile.email.trim() && profile.address.trim() && profile.city.trim() && profile.country.trim() && profile.postalCode?.trim() && /^\+\d{1,4}\s\d{10}$/.test(profile.phone))
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -197,6 +204,12 @@ export function BuyerPortalLayout() {
 
         <main className="admin-layout__main !pt-4 flex-1">
           <div className="mx-auto w-full max-w-[1600px]">
+            {!profileComplete ? (
+              <div role="status" className="mb-5 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950 sm:flex-row sm:items-center sm:justify-between">
+                <span>Complete your buyer contact and delivery details so they can be filled into your order requests.</span>
+                <Link to="/buyer/profile" className="shrink-0 font-semibold underline">Fill in buyer details</Link>
+              </div>
+            ) : null}
             <Outlet />
           </div>
         </main>
@@ -492,13 +505,13 @@ export function BuyerOrderDetailPage() {
     return <div className="rounded-2xl border border-dashed border-line bg-surface p-8 text-center text-muted">Order not found.</div>
   }
 
-  const handleClarificationResponse = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleClarificationResponse = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!session || !responseMessage.trim()) {
       setResponseError('Enter a response before submitting.')
       return
     }
-    const updated = addBuyerOrderResponse(order.id, responseMessage, session.userId)
+    const updated = await addBuyerOrderResponse(order.id, responseMessage, session.userId)
     if (!updated) {
       setResponseError('We could not match this order to your buyer account.')
       return
@@ -625,9 +638,29 @@ export function BuyerOrderDetailPage() {
 
 export function BuyerTrackingPage() {
   const session = getCurrentSession()
-  const orders = useMemo(() => getOrdersForBuyer(session?.userId ?? ''), [session])
+  const buyerId = session?.userId ?? ''
+  const [orders, setOrders] = useState<OrderRecord[]>(() => getOrdersForBuyer(buyerId))
+  const [trackingError, setTrackingError] = useState('')
   const [selectedOrderId, setSelectedOrderId] = useState(orders[0]?.id ?? '')
   const order = orders.find((entry) => entry.id === selectedOrderId) ?? orders[0]
+
+  useEffect(() => {
+    let alive = true
+    const refresh = async () => {
+      try {
+        const current = await http.get<OrderRecord[]>('/orders')
+        if (!alive) return
+        setOrders(current)
+        setTrackingError('')
+        setSelectedOrderId((selected) => selected || current[0]?.id || '')
+      } catch (err) {
+        if (alive) setTrackingError(err instanceof Error ? err.message : 'Could not refresh order tracking.')
+      }
+    }
+    void refresh()
+    const timer = window.setInterval(() => void refresh(), 8000)
+    return () => { alive = false; window.clearInterval(timer) }
+  }, [])
 
   if (!order) {
     return <div className="rounded-2xl border border-dashed border-line bg-surface p-10 text-center text-muted">No tracking data is available yet.</div>
@@ -648,6 +681,8 @@ export function BuyerTrackingPage() {
           </select>
         </div>
       </div>
+
+      {trackingError ? <p role="alert" className="text-sm text-muted">Live refresh unavailable: {trackingError}</p> : <p className="text-xs text-muted">Order status refreshes automatically every 8 seconds.</p>}
 
       <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
         <div className="mb-4 flex items-center justify-between gap-2">
@@ -682,36 +717,103 @@ export function BuyerTrackingPage() {
 export function BuyerProfilePage() {
   const navigate = useNavigate()
   const session = getCurrentSession()
-  const buyer = getCurrentSession() ? JSON.parse(localStorage.getItem('everest-buyer-users') || '[]').find((entry: { id: string }) => entry.id === session?.userId) : null
+  const buyer = session ? getBuyerById(session.userId) : undefined
+  const phoneParts = splitPhoneNumber(buyer?.phone ?? '')
   const [form, setForm] = useState({
     companyName: buyer?.companyName ?? session?.companyName ?? '',
     contactName: buyer?.contactName ?? session?.name ?? '',
     email: buyer?.email ?? session?.email ?? '',
-    phone: buyer?.phone ?? '',
+    phone: phoneParts.number,
     address: buyer?.address ?? '',
     city: buyer?.city ?? '',
     country: buyer?.country ?? '',
+    postalCode: buyer?.postalCode ?? '',
   })
+  const [dialCode, setDialCode] = useState(phoneParts.dialCode)
+  const [countries, setCountries] = useState<CountryOption[]>([])
+  const [countryError, setCountryError] = useState('')
+  const [saveError, setSaveError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [postalMessage, setPostalMessage] = useState('')
+  const { signOut, updateBuyerProfile: updateAuthBuyer } = useAuth()
 
-  const { signOut } = useAuth()
+  useEffect(() => {
+    let active = true
+    getCountries()
+      .then((list) => { if (active) setCountries(list) })
+      .catch(() => { if (active) setCountryError('Could not load the country list. Check your internet connection and reload this page.') })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    if (!form.country || !form.postalCode.trim() || form.postalCode.trim().length < 3) return
+    const country = countries.find((item) => item.name === form.country || item.code === form.country)
+    if (!country) return
+    let active = true
+    const timeout = window.setTimeout(() => {
+      void findCityByPostalCode(country.code, form.postalCode)
+        .then((city) => {
+          if (!active) return
+          setForm((current) => ({ ...current, city }))
+          setPostalMessage(`City filled from postal code: ${city}`)
+        })
+        .catch((error: unknown) => {
+          if (active) setPostalMessage(error instanceof Error ? error.message : 'Postal lookup is unavailable; enter the city manually.')
+        })
+    }, 650)
+    return () => { active = false; window.clearTimeout(timeout) }
+  }, [form.country, form.postalCode, countries])
+
   const handleLogout = () => {
     void signOut().finally(() => navigate('/login'))
   }
 
-  const handleSave = () => {
-    if (!session?.userId) {
+  const handleSave = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSaveError('')
+    setSaved(false)
+    if (!session?.userId) return
+    if (!isFullContactName(form.contactName)) {
+      setSaveError('Enter the contact person’s full name, including first and last name.')
       return
     }
-
-    updateBuyerProfile(session.userId, {
-      companyName: form.companyName,
-      contactName: form.contactName,
-      email: form.email,
-      phone: form.phone,
-      address: form.address,
-      city: form.city,
-      country: form.country,
-    })
+    if (form.phone.replace(/\D/g, '').length !== 10) {
+      setSaveError('Enter exactly 10 digits for the phone number.')
+      return
+    }
+    if (!form.companyName.trim() || !form.address.trim() || !form.city.trim() || !form.country || !form.postalCode.trim()) {
+      setSaveError('Complete your company, address, country, city, and postal code to finish your buyer profile.')
+      return
+    }
+    setSaving(true)
+    try {
+      const phone = `${dialCode} ${form.phone.replace(/\D/g, '')}`
+      await updateAuthBuyer({
+        full_name: form.contactName.trim(),
+        company: form.companyName.trim(),
+        phone,
+        address: form.address.trim(),
+        city: form.city.trim(),
+        country: form.country,
+        postal_code: form.postalCode.trim(),
+      })
+      updateBuyerProfile(session.userId, {
+        companyName: form.companyName.trim(),
+        contactName: form.contactName.trim(),
+        email: form.email,
+        phone,
+        address: form.address.trim(),
+        city: form.city.trim(),
+        country: form.country,
+        postalCode: form.postalCode.trim(),
+      })
+      setSaved(true)
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : 'Could not save your profile. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -727,35 +829,56 @@ export function BuyerProfilePage() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+        <form onSubmit={(event) => void handleSave(event)} className="rounded-2xl border border-line bg-surface p-5 shadow-card">
           <h2 className="text-lg font-semibold text-ink">Company profile</h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <Field label="Company name">
-              <input value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} className="input-base" />
+            <Field label="Company name *">
+              <input required value={form.companyName} onChange={(event) => setForm({ ...form, companyName: event.target.value })} className="input-base" />
             </Field>
-            <Field label="Contact person">
-              <input value={form.contactName} onChange={(event) => setForm({ ...form, contactName: event.target.value })} className="input-base" />
+            <Field label="Name (contact person) *">
+              <input required autoComplete="name" value={form.contactName} onChange={(event) => setForm({ ...form, contactName: event.target.value })} className="input-base" placeholder="First and last name" />
             </Field>
-            <Field label="Business email">
-              <input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="input-base" />
+            <Field label="Business email *">
+              <input type="email" readOnly value={form.email} className="input-base bg-canvas text-muted" />
             </Field>
-            <Field label="Phone number">
-              <input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} className="input-base" />
+            <Field label="Phone number *">
+              <div className="grid grid-cols-[minmax(8rem,0.8fr)_minmax(0,1.2fr)] gap-2">
+                <select aria-label="Country calling code" value={dialCode} onChange={(event) => setDialCode(event.target.value)} className="input-base" required>
+                  {[...new Map(countries.map((country) => [country.dialCode, country])).values()].map((country) => <option key={`${country.code}-${country.dialCode}`} value={country.dialCode}>{country.dialCode} · {country.code}</option>)}
+                  {!countries.length ? <option value={dialCode}>{dialCode}</option> : null}
+                </select>
+                <input required type="tel" inputMode="numeric" autoComplete="tel-national" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value.replace(/\D/g, '').slice(0, 10) })} className="input-base" placeholder="10 digit number" maxLength={10} />
+              </div>
             </Field>
-            <Field label="Address" className="sm:col-span-2">
-              <input value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} className="input-base" />
+            <Field label="Street address *" className="sm:col-span-2">
+              <input required autoComplete="street-address" value={form.address} onChange={(event) => setForm({ ...form, address: event.target.value })} className="input-base" />
             </Field>
-            <Field label="City">
-              <input value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} className="input-base" />
+            <Field label="Country *">
+              <select required value={countries.some((item) => item.name === form.country) ? form.country : ''} onChange={(event) => {
+                const selected = countries.find((item) => item.name === event.target.value)
+                setForm({ ...form, country: event.target.value, city: '' })
+                if (selected) setDialCode(selected.dialCode)
+                setPostalMessage('')
+              }} className="input-base">
+                <option value="">Select a country</option>
+                {countries.map((country) => <option key={country.code} value={country.name}>{country.name}</option>)}
+              </select>
             </Field>
-            <Field label="Country">
-              <input value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} className="input-base" />
+            <Field label="Postal / ZIP code *">
+              <input required autoComplete="postal-code" value={form.postalCode} onChange={(event) => { setForm({ ...form, postalCode: event.target.value }); setPostalMessage('') }} className="input-base" />
+            </Field>
+            <Field label="City *">
+              <input required autoComplete="address-level2" value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} className="input-base" />
             </Field>
           </div>
+          {countryError ? <p role="alert" className="mt-3 text-sm text-error">{countryError}</p> : null}
+          {postalMessage ? <p role="status" className="mt-3 text-sm text-muted">{postalMessage}</p> : null}
+          {saveError ? <p role="alert" className="mt-3 text-sm text-error">{saveError}</p> : null}
+          {saved ? <p role="status" className="mt-3 text-sm font-medium text-success">Profile saved. Your buyer workspace and order details now use this information.</p> : null}
           <div className="mt-5 flex justify-end">
-            <button type="button" onClick={handleSave} className={buttonClass('primary', 'md')}>Save changes</button>
+            <button type="submit" disabled={saving || !countries.length} className={buttonClass('primary', 'md')}>{saving ? 'Saving…' : 'Save changes'}</button>
           </div>
-        </div>
+        </form>
 
         <div className="space-y-6">
           <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
@@ -780,7 +903,7 @@ export function BuyerProfilePage() {
                   <MapPin className="mt-1 h-4 w-4 text-primary" />
                   <div>
                     <p className="font-medium text-ink">Primary address</p>
-                    <p className="text-sm text-muted">14 Market Road, Andheri East, Mumbai</p>
+                    <p className="text-sm text-muted">{[form.address, form.city, form.postalCode, form.country].filter(Boolean).join(', ') || 'Add your delivery address in Company profile.'}</p>
                   </div>
                 </div>
               </div>
@@ -801,13 +924,15 @@ export function BuyerInquiriesPage() {
   const [message, setMessage] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!buyerId || !subject.trim() || !message.trim()) {
       return
     }
 
-    createInquiryForOrder(buyerId, 'ORD-2048', subject, type, message)
+    const relatedOrder = getOrdersForBuyer(buyerId)[0]
+    if (!relatedOrder) return
+    await createInquiryForOrder(relatedOrder.id, subject, type, message)
     setSubject('')
     setMessage('')
     setSubmitted(true)

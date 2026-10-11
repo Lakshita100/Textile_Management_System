@@ -8,6 +8,7 @@ from sqlalchemy import and_, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.models.machine import Machine, MachineStatus
+from app.models.order import BuyerOrder
 from app.models.production import (
     MachineDowntime,
     ProductionJob,
@@ -191,6 +192,32 @@ def transition_job(
     old = job.status
     job.status = target
     db.add(ProductionJobStatusEvent(job_id=job.id, from_status=old, to_status=target, note=note))
+    order = db.get(BuyerOrder, job.order_ref)
+    if order is not None and target == ProductionJobStatus.IN_PROGRESS:
+        timestamp = now.isoformat()
+        message = f"Production started for order {order.id} on machine {job.machine.code}."
+        if order.status != "In Production":
+            order.status = "In Production"
+            order.status_history = [*(order.status_history or []), {"status": "In Production", "note": message, "timestamp": timestamp}]
+            order.buyer_visible_updates = [*(order.buyer_visible_updates or []), {"sender": "admin", "message": message, "timestamp": timestamp}]
+            order.updated_at = now.replace(tzinfo=None)
+    elif order is not None and target in {ProductionJobStatus.COMPLETED, ProductionJobStatus.CANCELLED}:
+        db.flush()
+        remaining = db.query(ProductionJob).filter(
+            ProductionJob.order_ref == order.id,
+            ProductionJob.status.notin_([ProductionJobStatus.COMPLETED, ProductionJobStatus.CANCELLED]),
+        ).first()
+        completed = db.query(ProductionJob).filter(
+            ProductionJob.order_ref == order.id,
+            ProductionJob.status == ProductionJobStatus.COMPLETED,
+        ).first()
+        if remaining is None and completed is not None and order.status != "Quality Check":
+            timestamp = now.isoformat()
+            message = "All scheduled production steps are complete; goods are awaiting quality inspection."
+            order.status = "Quality Check"
+            order.status_history = [*(order.status_history or []), {"status": "Quality Check", "note": message, "timestamp": timestamp}]
+            order.buyer_visible_updates = [*(order.buyer_visible_updates or []), {"sender": "admin", "message": message, "timestamp": timestamp}]
+            order.updated_at = now.replace(tzinfo=None)
     db.commit()
     db.refresh(job)
     return job

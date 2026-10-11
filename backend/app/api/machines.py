@@ -1,5 +1,7 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, exists, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -49,11 +51,22 @@ def list_machines(
     db: Session = Depends(get_db),
 ):
     q = select(Machine)
+    running_job_exists = exists(
+        select(ProductionJob.id).where(
+            ProductionJob.machine_id == Machine.id,
+            ProductionJob.status == ProductionJobStatus.IN_PROGRESS,
+        )
+    )
+    effective_status = case(
+        (Machine.status == MachineStatus.MAINTENANCE, MachineStatus.MAINTENANCE.value),
+        (running_job_exists, MachineStatus.RUNNING.value),
+        else_=MachineStatus.IDLE.value,
+    )
     if search:
         like = f"%{search.strip()}%"
         q = q.where((Machine.code.ilike(like)) | (Machine.name.ilike(like)))
     if status:
-        q = q.where(Machine.status == status)
+        q = q.where(effective_status == status.value)
     if process:
         q = q.where(Machine.supported_processes.ilike(f"%{process.strip().upper()}%"))
 
@@ -61,10 +74,40 @@ def list_machines(
     pages = max(1, (total + page_size - 1) // page_size)
     rows = db.scalars(q.order_by(Machine.id).offset((page - 1) * page_size).limit(page_size)).all()
 
+    # Fetch page-wide assignment and efficiency data in batches. The previous
+    # per-machine service calls caused 3 queries per machine (300+ round trips
+    # for a 100-machine page), which is especially slow with remote Supabase DBs.
+    machine_ids = [m.id for m in rows]
+    active_jobs: dict[int, ProductionJob] = {}
+    efficiencies: dict[int, list[float]] = {}
+    if machine_ids:
+        for job in db.scalars(
+            select(ProductionJob)
+            .where(
+                ProductionJob.machine_id.in_(machine_ids),
+                ProductionJob.status.in_([ProductionJobStatus.IN_PROGRESS, ProductionJobStatus.PAUSED]),
+            )
+            .order_by(ProductionJob.created_at.desc())
+        ).all():
+            active_jobs.setdefault(job.machine_id, job)
+
+        since = datetime.now(timezone.utc) - timedelta(days=90)
+        completed_jobs = db.scalars(
+            select(ProductionJob).where(
+                ProductionJob.machine_id.in_(machine_ids),
+                ProductionJob.status == ProductionJobStatus.COMPLETED,
+                ProductionJob.updated_at >= since,
+            )
+        ).all()
+        for job in completed_jobs:
+            ratio = min(1.0, job.actual_quantity / job.planned_quantity) if job.planned_quantity > 0 else 0.0
+            efficiencies.setdefault(job.machine_id, []).append(ratio)
+
     items = []
     for m in rows:
-        active = machine_service.get_active_job(db, m.id)
-        eff = machine_service.completed_jobs_efficiency_percent(db, m.id)
+        active = active_jobs.get(m.id)
+        ratios = efficiencies.get(m.id, [])
+        efficiency = round(100.0 * sum(ratios) / len(ratios), 2) if ratios else None
         items.append(
             MachineListOut(
                 id=m.id,
@@ -74,10 +117,13 @@ def list_machines(
                 supported_processes=m.supported_processes,
                 capacity_value=m.capacity_value,
                 capacity_unit=m.capacity_unit,
-                status=m.status,
+                status=MachineStatus.MAINTENANCE if m.status == MachineStatus.MAINTENANCE else (
+                    MachineStatus.RUNNING if active is not None and active.status == ProductionJobStatus.IN_PROGRESS
+                    else MachineStatus.IDLE
+                ),
                 current_assignment=_assignment_out(active) if active else None,
-                available_for_assignment=machine_service.is_available_for_assignment(db, m),
-                efficiency_percent=eff,
+                available_for_assignment=m.status != MachineStatus.MAINTENANCE and active is None,
+                efficiency_percent=efficiency,
             )
         )
     return Page[MachineListOut](items=items, total=total, page=page, page_size=page_size, pages=pages)
@@ -109,6 +155,8 @@ def machine_detail(machine_id: int, db: Session = Depends(get_db)):
     active = machine_service.get_active_job(db, m.id)
     eff = machine_service.completed_jobs_efficiency_percent(db, m.id)
     base = MachineOut.model_validate(m)
+    if m.status != MachineStatus.MAINTENANCE:
+        base.status = MachineStatus.RUNNING if active and active.status == ProductionJobStatus.IN_PROGRESS else MachineStatus.IDLE
     return MachineDetailOut(
         **base.model_dump(),
         current_assignment=_assignment_out(active) if active else None,
