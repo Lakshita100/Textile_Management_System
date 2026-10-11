@@ -38,7 +38,17 @@ def create_app() -> FastAPI:
         try:
             seed_user(db, email="buyer@voguegarments.com", password="Buyer12345678", full_name="Vikram Singhania", role="buyer", company="Vogue Garments Ltd")
             seed_user(db, email="worker@everestmills.com", password="Worker12345678", full_name="Ramesh Kumar", role="staff", company="Everest Textile Mills")
-            seed_user(db, email="admin@everestmills.com", password="Admin12345678", full_name="Rajesh Mehta", role="admin", company="Everest Textile Mills")
+
+            # Main Admin Account (ADM-000002)
+            admin_user = db.query(User).filter(User.email == "admin@everestmills.com").first()
+            if not admin_user:
+                admin_user = seed_user(db, email="admin@everestmills.com", password="Admin12345678", full_name="Rajesh Mehta", role="admin", company="Everest Textile Mills")
+            if admin_user:
+                admin_user.password_hash = hash_password("Admin12345678")
+                admin_user.role = "admin"
+                if not admin_user.login_id:
+                    admin_user.login_id = f"ADM-{admin_user.id:06d}"
+                db.commit()
 
             # Employee Head Account
             head_user = db.query(User).filter(User.email == "head@gmail.com").first()
@@ -59,11 +69,8 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.BACKEND_CORS_ORIGINS,
-        # Vite may move to 5174 (or another local port) when its default
-        # port is occupied. Keep this relaxed only for local development;
-        # production continues to use the explicit allowlist above.
         allow_origin_regex=(
-            r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+            r"^https?://.*$"
             if settings.ENVIRONMENT.lower() == "development"
             else None
         ),

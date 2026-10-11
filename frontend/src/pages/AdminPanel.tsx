@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link, NavLink, Navigate, Outlet, useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, ArrowRight, Bell, CheckCircle2, ClipboardList, FileText, PackageCheck, Search, ShieldCheck, Truck } from 'lucide-react'
+import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { AlertCircle, ArrowRight, Bell, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, FileText, PackageCheck, Search, ShieldCheck, Truck } from 'lucide-react'
 import { buttonClass } from '../components/ui/Button'
 import { useAuth } from '../store/AuthProvider'
 import {
@@ -16,7 +16,14 @@ import {
   updateInquiryStatus,
 } from '../services/orderService'
 
-const adminNav = [
+interface AdminNavItem {
+  to?: string;
+  label: string;
+  end?: boolean;
+  children?: { to: string; label: string }[];
+}
+
+const adminNav: AdminNavItem[] = [
   { to: '/admin', label: 'Overview', end: true },
   { to: '/admin/orders', label: 'All Orders', end: false },
   { to: '/admin/incoming', label: 'Incoming Orders', end: false },
@@ -24,8 +31,16 @@ const adminNav = [
   { to: '/admin/inquiries', label: 'Order Inquiries', end: false },
   { to: '/admin/employees', label: 'Employee Access', end: false },
   { to: '/admin/attendance', label: 'Attendance Register', end: false },
-  { to: '/admin/materials', label: 'Raw Materials', end: false },
-  { to: '/admin/production', label: 'Production Management', end: false },
+  {
+    label: 'Production Management',
+    to: '/admin/production',
+    children: [
+      { to: '/admin/inventory', label: 'Yarn Inventory' },
+      { to: '/admin/alerts', label: 'Low-Stock Alerts' },
+      { to: '/admin/movements', label: 'Stock Movements' },
+      { to: '/admin/suppliers', label: 'Suppliers' },
+    ],
+  },
   { to: '/admin/machines', label: 'Machine Management', end: false },
   { to: '/admin/jobs', label: 'Production Jobs', end: false },
   { to: '/admin/recommend', label: 'Machine Recommendations', end: false },
@@ -59,11 +74,19 @@ export function AdminRouteGuard() {
 
 export function AdminPanelLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const session = getCurrentSession()
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    'Production Management': true,
+  })
 
   const { signOut } = useAuth()
   const handleLogout = () => {
     void signOut().finally(() => navigate('/login'))
+  }
+
+  const toggleGroup = (label: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }))
   }
 
   return (
@@ -76,20 +99,71 @@ export function AdminPanelLayout() {
           </div>
 
           <nav className="flex flex-col gap-1 p-3" aria-label="Admin navigation">
-            {adminNav.map(({ to, label, end }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) =>
-                  `rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                    isActive ? 'bg-primary text-white' : 'text-muted hover:bg-canvas hover:text-primary'
-                  }`
-                }
-              >
-                {label}
-              </NavLink>
-            ))}
+            {adminNav.map((item) => {
+              if (item.children && item.children.length > 0) {
+                const isExpanded = !!expandedGroups[item.label]
+                const isChildActive = item.children.some((c) => location.pathname.startsWith(c.to))
+                const isParentActive = item.to ? location.pathname === item.to || isChildActive : isChildActive
+
+                return (
+                  <div key={item.label} className="space-y-1">
+                    <div className="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition hover:bg-canvas">
+                      <NavLink
+                        to={item.to!}
+                        className={() =>
+                          `flex-1 font-semibold transition ${
+                            isParentActive ? 'text-primary' : 'text-ink hover:text-primary'
+                          }`
+                        }
+                      >
+                        {item.label}
+                      </NavLink>
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(item.label)}
+                        className="p-1 text-muted hover:text-primary"
+                        aria-label="Toggle sub-modules"
+                      >
+                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </button>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="ml-3 border-l border-line pl-2 space-y-1">
+                        {item.children.map((child) => (
+                          <NavLink
+                            key={child.to}
+                            to={child.to}
+                            className={({ isActive }) =>
+                              `block rounded-lg px-3 py-2 text-xs font-medium transition ${
+                                isActive ? 'bg-primary text-white font-semibold' : 'text-muted hover:bg-canvas hover:text-primary'
+                              }`
+                            }
+                          >
+                            {child.label}
+                          </NavLink>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to!}
+                  end={item.end}
+                  className={({ isActive }) =>
+                    `rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+                      isActive ? 'bg-primary text-white' : 'text-muted hover:bg-canvas hover:text-primary'
+                    }`
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              )
+            })}
           </nav>
 
           <div className="mt-auto border-t border-line p-4">
