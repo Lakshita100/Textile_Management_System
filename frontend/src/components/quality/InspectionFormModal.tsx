@@ -214,17 +214,17 @@ export default function InspectionFormModal({ initialMachineId }: { initialMachi
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-title/40"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/45 p-4 backdrop-blur-sm sm:p-6"
       onClick={(e) => {
         if (e.target === e.currentTarget) closeForm()
       }}
     >
-      <div className="flex min-h-full items-start justify-center px-4 py-8">
+      <div className="flex w-full max-w-2xl items-center justify-center">
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="new-inspection-title"
-          className="card w-full max-w-2xl p-5 sm:p-6"
+          className="card max-h-[calc(100dvh-2rem)] w-full overflow-y-auto p-5 shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:p-6"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-4 flex items-center justify-between gap-3 border-b border-line pb-3">

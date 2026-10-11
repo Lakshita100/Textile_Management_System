@@ -29,6 +29,10 @@ export default function QualityDashboardPage() {
   const dash = useAsync(getDashboardBundle, [])
   const { openForm } = useInspectionForm()
   const d = dash.data
+  const machineSummaries = d
+    ? [...d.summaries].sort((a, b) => b.totalDefects - a.totalDefects).slice(0, 5)
+    : []
+  const matrixRows = d ? d.matrix.slice(0, 5) : []
 
   return (
     <div>
@@ -100,26 +104,26 @@ export default function QualityDashboardPage() {
 
           <section className="mt-5" aria-label="Machine focus">
             <h2 className="mb-3 text-lg font-semibold text-title">Machines</h2>
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-2">
               <div className="card min-w-0 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-title">Efficiency by machine</h3>
-                <div className="h-72 w-full">
+                <div className="h-80 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={d.summaries.map((s) => ({
+                      data={machineSummaries.map((s) => ({
                         name: s.machine.name,
                         efficiency: s.efficiencyPct,
                         flagged: s.needsInvestigation,
                       }))}
                       layout="vertical"
-                      margin={{ top: 8, right: 16, bottom: 0, left: 8 }}
+                      margin={{ top: 8, right: 24, bottom: 8, left: 12 }}
                     >
                       <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" horizontal={false} />
                       <XAxis type="number" {...axisProps} domain={[0, 100]} unit="%" />
-                      <YAxis type="category" dataKey="name" {...axisProps} width={120} />
+                      <YAxis type="category" dataKey="name" {...axisProps} width={140} />
                       <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--color-surface)' }} />
                       <Bar dataKey="efficiency" name="Efficiency %" radius={[0, 4, 4, 0]}>
-                        {d.summaries.map((s) => (
+                        {machineSummaries.map((s) => (
                           <Cell
                             key={s.machine.id}
                             fill={s.needsInvestigation ? 'var(--color-heading)' : 'var(--color-accent)'}
@@ -133,23 +137,23 @@ export default function QualityDashboardPage() {
 
               <div className="card min-w-0 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-title">Defects produced by machine</h3>
-                <div className="h-72 w-full">
+                <div className="h-80 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={d.summaries.map((s) => ({
+                      data={machineSummaries.map((s) => ({
                         name: s.machine.name,
                         defects: s.totalDefects,
                         flagged: s.needsInvestigation,
                       }))}
                       layout="vertical"
-                      margin={{ top: 8, right: 16, bottom: 0, left: 8 }}
+                      margin={{ top: 8, right: 24, bottom: 8, left: 12 }}
                     >
                       <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" horizontal={false} />
                       <XAxis type="number" {...axisProps} allowDecimals={false} />
-                      <YAxis type="category" dataKey="name" {...axisProps} width={120} />
+                      <YAxis type="category" dataKey="name" {...axisProps} width={140} />
                       <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--color-surface)' }} />
                       <Bar dataKey="defects" name="Defects" radius={[0, 4, 4, 0]}>
-                        {d.summaries.map((s) => (
+                        {machineSummaries.map((s) => (
                           <Cell
                             key={s.machine.id}
                             fill={s.needsInvestigation ? 'var(--color-heading)' : 'var(--color-primary)'}
@@ -165,15 +169,15 @@ export default function QualityDashboardPage() {
 
           <section className="mt-5" aria-label="Defect focus">
             <h2 className="mb-3 text-lg font-semibold text-title">Defects</h2>
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <div className="grid grid-cols-1 items-stretch gap-5 xl:grid-cols-2">
               <div className="card min-w-0 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-title">Defects by type</h3>
                 {d.byType.length > 0 ? (
-                  <div className="h-64 w-full">
+                  <div className="h-72 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={d.byType} margin={{ top: 8, right: 16, bottom: 0, left: -8 }}>
+                      <BarChart data={d.byType} margin={{ top: 8, right: 24, bottom: 16, left: 4 }}>
                         <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                        <XAxis dataKey="type" {...axisProps} interval={0} angle={-18} textAnchor="end" height={56} />
+                        <XAxis dataKey="type" {...axisProps} interval={0} angle={-25} textAnchor="end" height={72} />
                         <YAxis {...axisProps} width={44} allowDecimals={false} />
                         <Tooltip contentStyle={tooltipStyle} cursor={{ fill: 'var(--color-surface)' }} />
                         <Bar dataKey="count" name="Defects" radius={[4, 4, 0, 0]}>
@@ -197,12 +201,12 @@ export default function QualityDashboardPage() {
                   Which machine produced which defect
                 </h3>
                 <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
+                  <table className="min-w-[680px] w-full border-collapse text-sm">
                     <thead>
                       <tr>
-                        <th className="table-header px-3 py-2 text-left">Machine</th>
+                        <th className="table-header whitespace-nowrap px-3 py-2 text-left">Machine</th>
                         {DEFECT_TYPES.map((type) => (
-                          <th key={type} className="table-header px-3 py-2 text-right" title={type}>
+                          <th key={type} className="table-header whitespace-nowrap px-3 py-2 text-right" title={type}>
                             {type}
                           </th>
                         ))}
@@ -210,9 +214,9 @@ export default function QualityDashboardPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {d.matrix.map((row) => (
+                      {matrixRows.map((row) => (
                         <tr key={row.machineId} className="border-b border-line hover:bg-panel">
-                          <td className="px-3 py-2 font-medium text-title">{row.machineName}</td>
+                          <td className="whitespace-nowrap px-3 py-2 font-medium text-title">{row.machineName}</td>
                           {DEFECT_TYPES.map((type) => (
                             <td key={type} className="px-3 py-2 text-right">
                               {row.counts[type] > 0 ? row.counts[type] : '-'}
