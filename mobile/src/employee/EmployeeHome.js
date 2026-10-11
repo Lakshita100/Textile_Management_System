@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   useWindowDimensions,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -19,11 +20,24 @@ export default function EmployeeHome({ onNavigateToAttendance }) {
     activeShift,
     employeeAttendanceLogs,
     logout,
+    syncBackendAttendance,
   } = useContext(AppContext);
 
   const { width } = useWindowDimensions();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [scannerVisible, setScannerVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncBackendAttendance();
+    setRefreshing(false);
+  }, [syncBackendAttendance]);
+
+  // Sync with backend on mount
+  useEffect(() => {
+    syncBackendAttendance();
+  }, [syncBackendAttendance]);
 
   // Live ticking clock
   useEffect(() => {
@@ -62,12 +76,28 @@ export default function EmployeeHome({ onNavigateToAttendance }) {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.exitBtn} onPress={logout}>
-          <Feather name="log-out" size={16} color={COLORS.danger} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={[styles.exitBtn, { marginRight: 8, borderColor: COLORS.line }]} onPress={onRefresh}>
+            <Feather name="refresh-cw" size={15} color={COLORS.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exitBtn} onPress={logout}>
+            <Feather name="log-out" size={16} color={COLORS.danger} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {/* Worker Info */}
         <View style={styles.workerCard}>
           <View style={styles.avatar}>

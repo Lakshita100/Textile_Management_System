@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,16 +6,36 @@ import {
   ScrollView,
   TouchableOpacity,
   useWindowDimensions,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { AppContext, STATION_QR_DATA } from '../context/AppContext';
+import { AppContext, STATION_QR_DATA, generateStationQrData } from '../context/AppContext';
 import { COLORS } from '../styles/theme';
 
 export default function AdminHome() {
-  const { currentUser, employees, logout } = useContext(AppContext);
+  const { currentUser, employees, logout, syncBackendAttendance } = useContext(AppContext);
   const { width } = useWindowDimensions();
+  const [refreshing, setRefreshing] = useState(false);
+  const [stationQr, setStationQr] = useState(
+    typeof generateStationQrData === 'function' ? generateStationQrData() : STATION_QR_DATA
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncBackendAttendance();
+    setRefreshing(false);
+  }, [syncBackendAttendance]);
+
+  // Initial sync & auto poll every 5s so on-duty employees update in real time
+  useEffect(() => {
+    syncBackendAttendance();
+    const interval = setInterval(() => {
+      syncBackendAttendance();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [syncBackendAttendance]);
 
   const onDutyEmployees = employees.filter((emp) => emp.status === 'ON DUTY');
   const offDutyEmployees = employees.filter((emp) => emp.status === 'OFF DUTY');
@@ -37,12 +57,28 @@ export default function AdminHome() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.exitBtn} onPress={logout}>
-          <Feather name="log-out" size={16} color={COLORS.danger} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity style={[styles.exitBtn, { marginRight: 8, borderColor: COLORS.line }]} onPress={onRefresh}>
+            <Feather name="refresh-cw" size={15} color={COLORS.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.exitBtn} onPress={logout}>
+            <Feather name="log-out" size={16} color={COLORS.danger} />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {/* Employee Head Card */}
         <View style={styles.adminCard}>
           <View style={styles.avatar}>
@@ -73,7 +109,7 @@ export default function AdminHome() {
 
           <View style={styles.qrContainer}>
             <QRCode
-              value={STATION_QR_DATA}
+              value={stationQr}
               size={qrSize}
               color="#073B63"
               backgroundColor="#FFFFFF"

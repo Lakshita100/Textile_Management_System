@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -13,20 +14,47 @@ import { AppContext } from '../context/AppContext';
 import { COLORS } from '../styles/theme';
 
 export default function EmployeeAttendance() {
-  const { employeeAttendanceLogs } = useContext(AppContext);
+  const { employeeAttendanceLogs, syncBackendAttendance } = useContext(AppContext);
   const [searchTerm, setSearchTerm] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncBackendAttendance();
+    setRefreshing(false);
+  }, [syncBackendAttendance]);
+
+  useEffect(() => {
+    syncBackendAttendance();
+  }, [syncBackendAttendance]);
 
   const filteredLogs = employeeAttendanceLogs.filter((log) =>
-    log.date.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    log.inTime.toLowerCase().includes(searchTerm.toLowerCase())
+    (log.date && log.date.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (log.inTime && log.inTime.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Attendance History</Text>
-        <Text style={styles.headerSub}>Complete record of shift punches & durations</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Text style={styles.headerTitle}>Attendance History</Text>
+            <Text style={styles.headerSub}>Complete record of shift punches & durations</Text>
+          </View>
+          <TouchableOpacity
+            style={{
+              padding: 8,
+              borderRadius: 8,
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
+              borderColor: COLORS.line,
+            }}
+            onPress={onRefresh}
+          >
+            <Feather name="refresh-cw" size={16} color={COLORS.primary} />
+          </TouchableOpacity>
+        </View>
 
         {/* Search Bar */}
         <View style={styles.searchBar}>
@@ -41,7 +69,17 @@ export default function EmployeeAttendance() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+            colors={[COLORS.primary]}
+          />
+        }
+      >
         {filteredLogs.length === 0 ? (
           <View style={styles.emptyCard}>
             <Ionicons name="calendar-outline" size={36} color={COLORS.muted} />
