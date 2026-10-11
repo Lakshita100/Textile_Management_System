@@ -134,16 +134,27 @@ def create_order(payload: BuyerOrderCreateIn, user: User = Depends(current_user)
 
 @router.post("/orders/manual", status_code=201)
 def create_manual_order(payload: ManualOrderCreateIn, user: User = Depends(require_admin), db: Session = Depends(get_db)) -> dict:
+    if payload.yarnId:
+        yarn = db.get(YarnInventory, payload.yarnId)
+        if yarn is None:
+            raise HTTPException(404, {"message": "The selected yarn is no longer in inventory.", "code": "YARN_NOT_FOUND"})
+        if payload.productCategory != "Yarn":
+            raise HTTPException(400, {"message": "A yarn inventory row can only be selected for a yarn order.", "code": "INVALID_YARN_SELECTION"})
     timestamp = _now()
     order = BuyerOrder(
         id=f"ORD-{timestamp.strftime('%y%m%d%H%M%S')}-{token_hex(2).upper()}",
         buyer_id=f"manual-{user.id}", buyer_name=payload.buyerName, company_name=payload.companyName,
         buyer_email=payload.buyerEmail, buyer_phone=payload.buyerPhone, source="Manual",
         product_category=payload.productCategory, product_name=payload.productName,
-        product_code=payload.productCode, material_composition=payload.materialComposition,
-        shade=payload.shade, quantity=payload.quantity, unit=payload.unit, priority="Standard",
+        product_code=payload.productCode, yarn_id=payload.yarnId, yarn_type=payload.yarnType,
+        yarn_subtype=payload.yarnSubtype, material_composition=payload.materialComposition,
+        technical_specifications=payload.technicalSpecifications, denier_count=payload.denierCount,
+        shade=payload.shade, special_requirements=payload.specialRequirements,
+        quantity=payload.quantity, unit=payload.unit, priority=payload.priority,
         requested_delivery_date=payload.requestedDeliveryDate, delivery_address=payload.deliveryAddress,
-        technical_notes=payload.notes or None, commercial_notes=payload.notes or None,
+        delivery_instructions=payload.deliveryInstructions, target_price=payload.targetPrice,
+        buyer_notes=payload.buyerNotes, technical_notes=payload.technicalNotes,
+        commercial_notes=payload.commercialNotes,
         status="Submitted", review_history=[], buyer_visible_updates=[], status_history=[{
             "status": "Submitted", "note": "Manual order received by sales desk.", "timestamp": timestamp.isoformat(),
         }], created_at=timestamp, updated_at=timestamp, submitted_at=timestamp,

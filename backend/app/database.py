@@ -25,11 +25,15 @@ def _build_engine(url: str) -> Engine:
     if url.startswith("sqlite"):
         connect_args = {"timeout": 30, "check_same_thread": False}
     else:
+        # Supabase's transaction/session pooler caps clients at 15 in session
+        # mode. Keep total connections (pool_size + max_overflow) well below
+        # that ceiling so concurrent requests don't exhaust the pool.
         extra_kwargs = {
-            "pool_size": 5,
-            "max_overflow": 10,
+            "pool_size": 3,
+            "max_overflow": 7,
             "pool_pre_ping": True,
             "pool_recycle": 300,
+            "pool_timeout": 30,
         }
 
     try:

@@ -62,19 +62,30 @@ class BuyerOrderResponseIn(BaseModel):
 class ManualOrderCreateIn(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
     companyName: str = Field(min_length=1, max_length=150)
-    buyerName: str = Field(default="Manual order contact", max_length=120)
+    buyerName: str = Field(min_length=1, max_length=120)
     buyerEmail: str | None = Field(default=None, max_length=255)
     buyerPhone: str | None = Field(default=None, max_length=50)
     productName: str = Field(min_length=1, max_length=200)
     productCode: str | None = Field(default=None, max_length=64)
     productCategory: str = Field(default="Yarn", max_length=100)
-    materialComposition: str = Field(default="General textile blend", max_length=255)
-    shade: str = Field(default="Custom", max_length=100)
+    yarnId: str | None = Field(default=None, max_length=32)
+    yarnType: str | None = Field(default=None, max_length=100)
+    yarnSubtype: str | None = Field(default=None, max_length=255)
+    materialComposition: str = Field(min_length=1, max_length=255)
+    technicalSpecifications: str | None = None
+    denierCount: str | None = Field(default=None, max_length=100)
+    shade: str = Field(min_length=1, max_length=100)
+    specialRequirements: str | None = None
     quantity: float = Field(gt=0)
     unit: str = Field(min_length=1, max_length=32)
+    priority: str = Field(default="Standard", max_length=32)
     requestedDeliveryDate: str | None = Field(default=None, max_length=64)
     deliveryAddress: str | None = None
-    notes: str = Field(default="", max_length=2000)
+    deliveryInstructions: str | None = None
+    targetPrice: str | None = Field(default=None, max_length=100)
+    buyerNotes: str | None = None
+    technicalNotes: str | None = None
+    commercialNotes: str | None = None
 
 
 class InquiryCreateIn(BaseModel):

@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
-  AlertCircle,
+   AlertCircle,
+  ArrowLeft,
   ArrowRight,
   Bell,
   CheckCircle2,
+  ClipboardCheck,
   ChevronDown,
   ChevronRight,
   ClipboardList,
@@ -20,6 +22,10 @@ import {
 import { buttonClass } from '../components/ui/Button'
 import { productionApi } from '../services/api'
 import { useAuth } from '../store/AuthProvider'
+import { getBuyerFabricCatalog, getBuyerYarnCatalog } from '../services/authService'
+import type { BuyerFabricCatalogItem, BuyerYarnCatalogItem } from '../services/authService'
+import { getCountries, isFullContactName } from '../services/locationService'
+import type { CountryOption } from '../services/locationService'
 import {
   addOrderReviewNote,
   createManualOrder,
@@ -619,69 +625,436 @@ export function AdminIncomingOrdersPage() {
 
 export function AdminManualOrderPage() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({
-    buyerCompany: '',
-    productName: '',
-    productCode: '',
-    quantity: '1200',
-    unit: 'kg',
-    requestedDeliveryDate: '',
-    deliveryAddress: '',
-    notes: '',
+  const [step, setStep] = useState<'form' | 'review'>('form')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [catalogError, setCatalogError] = useState('')
+  const [yarnCatalog, setYarnCatalog] = useState<BuyerYarnCatalogItem[]>([])
+  const [fabricCatalog, setFabricCatalog] = useState<BuyerFabricCatalogItem[]>([])
+  const [countries, setCountries] = useState<CountryOption[]>([])
+  const [submittedOrderId, setSubmittedOrderId] = useState('')
+
+  const [buyerForm, setBuyerForm] = useState({
+    companyName: '', buyerName: '', buyerEmail: '', dialCode: '+91', phone: '', country: '', city: '', postalCode: '',
   })
 
-  const handleCreate = async () => {
-    const created = await createManualOrder({
-      companyName: form.buyerCompany || 'Manual buyer',
-      productName: form.productName,
-      productCode: form.productCode,
-      quantity: Number(form.quantity) || 1,
-      unit: form.unit,
-      requestedDeliveryDate: form.requestedDeliveryDate || '',
-      deliveryAddress: form.deliveryAddress || 'Factory dispatch desk',
-      notes: form.notes,
-    })
-    navigate(`/admin/orders/${created.id}`)
+  type OrderForm = {
+    productCategory: string
+    productName: string
+    yarnType: string
+    yarnSubtype: string
+    productCode: string
+    yarnId: string
+    materialComposition: string
+    technicalSpecifications: string
+    denierCount: string
+    shade: string
+    specialRequirements: string
+    quantity: string
+    unit: 'kg' | 'metres'
+    priority: 'Standard' | 'Urgent' | 'Flexible'
+    requestedDeliveryDate: string
+    deliveryAddress: string
+    deliveryInstructions: string
+    targetPrice: string
+    buyerNotes: string
   }
 
+  const [form, setForm] = useState<OrderForm>({
+    productCategory: 'Yarn',
+    productName: '',
+    yarnType: '',
+    yarnSubtype: '',
+    productCode: '',
+    yarnId: '',
+    materialComposition: '',
+    technicalSpecifications: '',
+    denierCount: '',
+    shade: '',
+    specialRequirements: '',
+    quantity: '',
+    unit: 'kg',
+    priority: 'Standard',
+    requestedDeliveryDate: '',
+    deliveryAddress: '',
+    deliveryInstructions: '',
+    targetPrice: '',
+    buyerNotes: '',
+  })
+
+  const earliestDeliveryDate = new Date().toISOString().slice(0, 10)
+
+  useEffect(() => {
+    let active = true
+    Promise.all([getBuyerYarnCatalog(), getBuyerFabricCatalog(), getCountries()])
+      .then(([yarns, fabrics, countryRows]) => {
+        if (active) {
+          setYarnCatalog(yarns)
+          setFabricCatalog(fabrics)
+          setCountries(countryRows)
+        }
+      })
+      .catch((reason: unknown) => {
+        if (active) setCatalogError(reason instanceof Error ? reason.message : 'Could not load product catalogs.')
+      })
+      .finally(() => {
+        if (active) setCatalogLoading(false)
+      })
+    return () => { active = false }
+  }, [])
+
+  const yarnTypes = useMemo(() => [...new Set(yarnCatalog.map((item) => item.category))].sort(), [yarnCatalog])
+  const yarnSubtypes = useMemo(
+    () => [...new Set(yarnCatalog.filter((item) => !form.yarnType || item.category === form.yarnType).map((item) => `${item.materialComposition} · ${item.denierSpecification}`))].sort(),
+    [form.yarnType, yarnCatalog],
+  )
+  const matchingYarns = useMemo(
+    () => yarnCatalog.filter((item) => (!form.yarnType || item.category === form.yarnType) && (!form.yarnSubtype || `${item.materialComposition} · ${item.denierSpecification}` === form.yarnSubtype)),
+    [form.yarnSubtype, form.yarnType, yarnCatalog],
+  )
+  const matchingFabrics = useMemo(
+    () => fabricCatalog.filter((item) => !form.yarnType || item.fabricCategory === form.yarnType),
+    [fabricCatalog, form.yarnType],
+  )
+
+  const setField = <K extends keyof OrderForm>(field: K, value: OrderForm[K]) => {
+    setForm((current) => ({ ...current, [field]: value }))
+  }
+
+  const setBuyerField = (key: keyof typeof buyerForm, value: string) => {
+    setBuyerForm((current) => ({ ...current, [key]: value }))
+  }
+
+  const continueToReview = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setError('')
+    if (!buyerForm.companyName.trim() || !isFullContactName(buyerForm.buyerName) || !buyerForm.buyerEmail.trim() || !/^\d{10}$/.test(buyerForm.phone) || !buyerForm.country || !buyerForm.city.trim() || !buyerForm.postalCode.trim()) {
+      setError('Enter company name, a full contact name, valid email, 10 digit phone, country, city and postal code.')
+      return
+    }
+    if (form.productCategory === 'Yarn' && !form.yarnId) {
+      setError('Select an available yarn product from the inventory catalog.')
+      return
+    }
+    if (Number(form.quantity) <= 0) {
+      setError('Enter a quantity greater than zero.')
+      return
+    }
+    setStep('review')
+  }
+
+  const submitOrder = async () => {
+    if (submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      const created = await createManualOrder({
+        companyName: buyerForm.companyName.trim(),
+        buyerName: buyerForm.buyerName.trim(),
+        buyerEmail: buyerForm.buyerEmail.trim(),
+        buyerPhone: `${buyerForm.dialCode} ${buyerForm.phone}`,
+        productName: form.productName.trim(),
+        productCode: form.productCode.trim(),
+        yarnId: form.yarnId || undefined,
+        productCategory: form.productCategory,
+        yarnType: form.yarnType,
+        yarnSubtype: form.yarnSubtype.trim(),
+        materialComposition: form.materialComposition.trim(),
+        technicalSpecifications: form.technicalSpecifications.trim(),
+        denierCount: form.denierCount.trim(),
+        shade: form.shade.trim(),
+        specialRequirements: form.specialRequirements.trim(),
+        quantity: Number(form.quantity),
+        unit: form.unit,
+        priority: form.priority,
+        requestedDeliveryDate: form.requestedDeliveryDate,
+        deliveryAddress: `${form.deliveryAddress}, ${buyerForm.city}, ${buyerForm.country} ${buyerForm.postalCode}`,
+        deliveryInstructions: form.deliveryInstructions.trim(),
+        targetPrice: form.targetPrice.trim(),
+        buyerNotes: form.buyerNotes.trim(),
+        technicalNotes: [form.technicalSpecifications, form.denierCount ? `Denier/count: ${form.denierCount}` : '', form.specialRequirements].filter(Boolean).join('\n'),
+        commercialNotes: form.targetPrice ? `Target price / quotation request: ${form.targetPrice}` : form.buyerNotes ? form.buyerNotes : 'Quotation requested.',
+      })
+      setSubmittedOrderId(created.id)
+      setStep('review')
+      setTimeout(() => { navigate(`/admin/orders/${created.id}`) }, 1500)
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : 'The order could not be created. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const inputClass = 'h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm text-ink'
+
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
-        <h1 className="text-2xl font-bold text-ink">Create Manual Order</h1>
-        <p className="mt-1 text-sm text-muted">Capture buyer or offline orders into the central order register.</p>
+    <div className="mx-auto max-w-5xl space-y-5">
+      <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+        <Link to="/admin/incoming" className="inline-flex items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft className="h-4 w-4" /> Back to orders</Link>
+        <div className="mt-4 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Manual order</p>
+            <h1 className="mt-1 text-2xl font-bold text-ink">Create order on behalf of a buyer</h1>
+            <p className="mt-1 text-sm text-muted">Enter the buyer details manually, then fill the product requirements. The form mirrors the buyer portal, with the buyer information entered by the administrator.</p>
+          </div>
+          <span className="hidden rounded-full bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary sm:inline-flex">
+            {step === 'form' ? '1 of 2 · Requirements' : '2 of 2 · Review'}
+          </span>
+        </div>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1.5fr_0.9fr]">
-        <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
-          <div className="grid gap-3">
-            <FieldInput label="Buyer/company" value={form.buyerCompany} onChange={(value) => setForm({ ...form, buyerCompany: value })} />
-            <FieldInput label="Product name" value={form.productName} onChange={(value) => setForm({ ...form, productName: value })} />
-            <FieldInput label="Product code" value={form.productCode} onChange={(value) => setForm({ ...form, productCode: value })} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FieldInput label="Quantity" value={form.quantity} onChange={(value) => setForm({ ...form, quantity: value })} />
-              <FieldInput label="Unit" value={form.unit} onChange={(value) => setForm({ ...form, unit: value })} />
+      {step === 'form' ? (
+        <form onSubmit={continueToReview} className="space-y-5">
+          <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+            <h2 className="text-lg font-semibold text-ink">Buyer details</h2>
+            <p className="mt-1 text-sm text-muted">All buyer information is entered by the administrator.</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <Field label="Company / buyer name *" required>
+                <input required value={buyerForm.companyName} onChange={(event) => setBuyerField('companyName', event.target.value)} className={inputClass} />
+              </Field>
+              <Field label="Contact person full name *" required>
+                <input required value={buyerForm.buyerName} onChange={(event) => setBuyerField('buyerName', event.target.value)} className={inputClass} />
+              </Field>
+              <Field label="Business email *" required>
+                <input required type="email" value={buyerForm.buyerEmail} onChange={(event) => setBuyerField('buyerEmail', event.target.value)} className={inputClass} />
+              </Field>
+              <Field label="Phone *" required>
+                <span className="mt-2 flex gap-2">
+                  <select aria-label="Country phone code" value={buyerForm.dialCode} onChange={(event) => setBuyerField('dialCode', event.target.value)} className="h-11 w-32 rounded-xl border border-line bg-canvas px-3 text-sm text-ink">
+                    {countries.map((c) => <option key={c.code} value={c.dialCode}>{c.name} ({c.dialCode})</option>)}
+                  </select>
+                  <input required inputMode="numeric" maxLength={10} pattern="[0-9]{10}" value={buyerForm.phone} onChange={(event) => setBuyerField('phone', event.target.value.replace(/\D/g, '').slice(0, 10))} className={inputClass} placeholder="10 digit number" />
+                </span>
+              </Field>
+              <Field label="Country *" required>
+                <select required value={buyerForm.country} onChange={(event) => setBuyerField('country', countries.find((c) => c.name === event.target.value)?.name ?? event.target.value)} className={inputClass}>
+                  <option value="">Select country</option>
+                  {countries.map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
+                </select>
+              </Field>
+              <Field label="City *" required>
+                <input required value={buyerForm.city} onChange={(event) => setBuyerField('city', event.target.value)} className={inputClass} />
+              </Field>
+              <Field label="Postal code *" required>
+                <input required value={buyerForm.postalCode} onChange={(event) => setBuyerField('postalCode', event.target.value)} className={inputClass} />
+              </Field>
             </div>
-            <FieldInput label="Requested delivery date" type="date" value={form.requestedDeliveryDate} onChange={(value) => setForm({ ...form, requestedDeliveryDate: value })} />
-            <FieldInput label="Delivery address" value={form.deliveryAddress} onChange={(value) => setForm({ ...form, deliveryAddress: value })} />
-            <FieldInput label="Notes" value={form.notes} onChange={(value) => setForm({ ...form, notes: value })} textarea />
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <button type="button" className={buttonClass('secondary', 'md')}>Save draft</button>
-            <button type="button" onClick={handleCreate} className={buttonClass('primary', 'md')}>Submit order</button>
-          </div>
-        </div>
+          </section>
 
-        <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
-          <h2 className="text-lg font-semibold text-ink">Submission summary</h2>
-          <div className="mt-4 space-y-3 text-sm text-muted">
-            <p><span className="font-medium text-ink">Buyer:</span> {form.buyerCompany || 'Not provided'}</p>
-            <p><span className="font-medium text-ink">Product:</span> {form.productName || 'Not provided'}</p>
-            <p><span className="font-medium text-ink">Quantity:</span> {form.quantity || '0'} {form.unit || 'kg'}</p>
-            <p><span className="font-medium text-ink">Delivery:</span> {form.requestedDeliveryDate || 'Not set'}</p>
-            <p><span className="font-medium text-ink">Source:</span> Manual</p>
+          <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+            <h2 className="text-lg font-semibold text-ink">Product requirements</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <Field label="Product category" required>
+                <select required value={form.productCategory} onChange={(event) => {
+                  const value = event.target.value
+                  setForm((current) => ({
+                    ...current,
+                    productCategory: value as OrderForm['productCategory'],
+                    unit: value === 'Fabric' ? 'kg' : current.unit,
+                    productName: '', yarnId: '', productCode: '', yarnType: '', yarnSubtype: '',
+                    materialComposition: '', denierCount: '', shade: '',
+                  }))
+                }} className={inputClass}>
+                  <option value="">Select a category</option>
+                  <option>Yarn</option>
+                  <option>Fabric</option>
+                  <option>Garment / made-up</option>
+                  <option>Other textile</option>
+                </select>
+              </Field>
+              {form.productCategory === 'Yarn' ? (
+                <>
+                  <Field label="Yarn type" required>
+                    <select required value={form.yarnType} onChange={(event) => setForm((current) => ({ ...current, yarnType: event.target.value, yarnSubtype: '', yarnId: '', productName: '', productCode: '' }))} className={inputClass}>
+                      <option value="">{catalogLoading ? 'Loading yarn types…' : 'Select yarn type'}</option>
+                      {yarnTypes.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Yarn subtype / composition" required>
+                    <select required value={form.yarnSubtype} onChange={(event) => setForm((current) => ({ ...current, yarnSubtype: event.target.value, yarnId: '', productName: '', productCode: '' }))} className={inputClass}>
+                      <option value="">Select a valid type and composition</option>
+                      {yarnSubtypes.map((subtype) => <option key={subtype} value={subtype}>{subtype}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Product name" required>
+                    <select required value={form.yarnId} onChange={(event) => {
+                      const item = yarnCatalog.find((candidate) => candidate.yarnId === event.target.value)
+                      setForm((current) => ({
+                        ...current,
+                        yarnId: item?.yarnId ?? '',
+                        productName: item?.yarnName ?? '',
+                        productCode: item?.productCode ?? '',
+                        yarnType: item?.category ?? current.yarnType,
+                        yarnSubtype: item ? `${item.materialComposition} · ${item.denierSpecification}` : current.yarnSubtype,
+                        materialComposition: item?.materialComposition ?? '',
+                        denierCount: item?.denierSpecification ?? '',
+                        shade: item?.colourShade ?? '',
+                        unit: item?.unit.toLowerCase().includes('meter') ? 'metres' : 'kg',
+                      }))
+                    }} className={inputClass}>
+                      <option value="">{!form.yarnType || !form.yarnSubtype ? 'Choose yarn type and subtype first' : 'Select product'}</option>
+                      {matchingYarns.map((item) => <option key={item.yarnId} value={item.yarnId}>{item.yarnName} ({item.productCode})</option>)}
+                    </select>
+                  </Field>
+                  {catalogError ? <p role="alert" className="sm:col-span-2 rounded-lg bg-error/5 p-3 text-sm text-error">{catalogError}</p> : null}
+                  {!catalogLoading && !yarnCatalog.length ? <p className="sm:col-span-2 text-sm text-muted">No yarn products are currently listed in inventory.</p> : null}
+                </>
+              ) : form.productCategory === 'Fabric' ? (
+                <>
+                  <Field label="Fabric category" required>
+                    <select required value={form.yarnType} onChange={(event) => setForm((current) => ({ ...current, yarnType: event.target.value, productName: '', productCode: '', materialComposition: '', technicalSpecifications: '' }))} className={inputClass}>
+                      <option value="">{catalogLoading ? 'Loading fabric categories…' : 'Select a fabric category'}</option>
+                      {[...new Set(fabricCatalog.map((item) => item.fabricCategory))].sort().map((category) => <option key={category} value={category}>{category}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Fabric product" required>
+                    <select required value={form.productCode} onChange={(event) => {
+                      const item = fabricCatalog.find((candidate) => candidate.recipeCode === event.target.value)
+                      setForm((current) => ({
+                        ...current,
+                        productName: item?.fabricName ?? '',
+                        productCode: item?.recipeCode ?? '',
+                        materialComposition: item?.ingredients.map((ingredient) => `${ingredient.yarnType} ${ingredient.specification}`).join(' + ') ?? '',
+                        technicalSpecifications: item?.construction ?? '',
+                      }))
+                    }} className={inputClass}>
+                      <option value="">Select a fabric recipe</option>
+                      {matchingFabrics.map((item) => <option key={item.recipeCode} value={item.recipeCode}>{item.fabricName} ({item.recipeCode})</option>)}
+                    </select>
+                  </Field>
+                  {!catalogLoading && !fabricCatalog.length ? <p className="sm:col-span-2 text-sm text-muted">No active fabric recipes are listed in inventory.</p> : null}
+                </>
+              ) : (
+                <>
+                  <Field label="Product name" required>
+                    <input required value={form.productName} onChange={(event) => setField('productName', event.target.value)} className={inputClass} placeholder="Enter requested product" />
+                  </Field>
+                  <Field label="Product code (if available)">
+                    <input value={form.productCode} onChange={(event) => setField('productCode', event.target.value)} className={inputClass} />
+                  </Field>
+                </>
+              )}
+              {form.productCategory !== 'Fabric' ? (
+                <>
+                  <Field label="Material composition" required>
+                    <input required value={form.materialComposition} onChange={(event) => setField('materialComposition', event.target.value)} className={inputClass} placeholder="e.g. 100% organic cotton" />
+                  </Field>
+                  <Field label="Denier / count (if applicable)">
+                    <input value={form.denierCount} onChange={(event) => setField('denierCount', event.target.value)} className={inputClass} placeholder="e.g. 30s Ne / 150D" />
+                  </Field>
+                </>
+              ) : null}
+              <Field label="Colour / shade" required>
+                <input required value={form.shade} onChange={(event) => setField('shade', event.target.value)} className={inputClass} placeholder="Name or shade reference" />
+              </Field>
+              <Field label="Technical specifications" className="sm:col-span-2">
+                <textarea value={form.technicalSpecifications} onChange={(event) => setField('technicalSpecifications', event.target.value)} rows={3} className={`${inputClass} h-auto py-2`} placeholder="Twist, finish, tolerances, construction or other specifications" />
+              </Field>
+              <Field label="Special requirements" className="sm:col-span-2">
+                <textarea value={form.specialRequirements} onChange={(event) => setField('specialRequirements', event.target.value)} rows={2} className={`${inputClass} h-auto py-2`} />
+              </Field>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+            <h2 className="text-lg font-semibold text-ink">Quantity & delivery</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <Field label="Required quantity" required>
+                <input required type="number" min="0.01" step="any" value={form.quantity} onChange={(event) => setField('quantity', event.target.value)} className={inputClass} />
+              </Field>
+              <Field label="Unit" required>
+                <select value={form.unit} onChange={(event) => setField('unit', event.target.value as OrderForm['unit'])} className={inputClass}>
+                  <option value="kg">kg</option>
+                  <option value="metres" disabled={form.productCategory === 'Fabric'}>metres</option>
+                </select>
+                {form.productCategory === 'Fabric' ? <span className="mt-1 block text-xs text-muted">Fabric recipe ingredients are defined in kg, so this order is measured in kg.</span> : null}
+              </Field>
+              <Field label="Order priority">
+                <select value={form.priority} onChange={(event) => setField('priority', event.target.value as OrderForm['priority'])} className={inputClass}>
+                  <option>Standard</option>
+                  <option>Urgent</option>
+                  <option>Flexible</option>
+                </select>
+              </Field>
+              <Field label="Requested delivery date" required>
+                <input required type="date" min={earliestDeliveryDate} value={form.requestedDeliveryDate} onChange={(event) => setField('requestedDeliveryDate', event.target.value)} className={inputClass} />
+              </Field>
+              <Field label="Delivery address" required className="sm:col-span-2">
+                <textarea required rows={2} value={form.deliveryAddress} onChange={(event) => setField('deliveryAddress', event.target.value)} className={`${inputClass} h-auto py-2`} />
+              </Field>
+              <Field label="Delivery instructions" className="sm:col-span-2">
+                <textarea rows={2} value={form.deliveryInstructions} onChange={(event) => setField('deliveryInstructions', event.target.value)} className={`${inputClass} h-auto py-2`} />
+              </Field>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+            <h2 className="text-lg font-semibold text-ink">Commercial & additional information</h2>
+            <div className="mt-4 grid gap-4">
+              <Field label="Target price or quotation request">
+                <input value={form.targetPrice} onChange={(event) => setField('targetPrice', event.target.value)} className={inputClass} placeholder="Optional target price; leave blank to request a quotation" />
+              </Field>
+              <Field label="Buyer notes">
+                <textarea rows={3} value={form.buyerNotes} onChange={(event) => setField('buyerNotes', event.target.value)} className={`${inputClass} h-auto py-2`} placeholder="Anything else the buyer should consider" />
+              </Field>
+            </div>
+            <p className="mt-3 text-xs text-muted">File attachments are not supported by this local demo. Add colour-reference or specification details in the notes above.</p>
+          </section>
+
+          {error ? <div role="alert" className="rounded-xl border border-error/40 bg-error/5 p-3 text-sm font-medium text-error"><p>{error}</p></div> : null}
+          <div className="flex justify-end">
+            <button type="submit" className={buttonClass('primary', 'md')}>Review order <ArrowRight className="h-4 w-4" /></button>
           </div>
-        </div>
-      </div>
+        </form>
+      ) : (
+        <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+          <div className="flex items-start gap-3">
+            <ClipboardCheck className="mt-1 h-5 w-5 text-primary" />
+            <div>
+              <h2 className="text-lg font-semibold text-ink">Review & submit</h2>
+              <p className="mt-1 text-sm text-muted">Confirm the buyer details and requirements before creating the order.</p>
+            </div>
+          </div>
+          <dl className="mt-5 grid gap-3 sm:grid-cols-2">
+            {[
+              ['Buyer', `${buyerForm.companyName} · ${buyerForm.buyerName}`],
+              ['Contact', `${buyerForm.buyerEmail} · ${buyerForm.dialCode} ${buyerForm.phone}`],
+              ['Location', `${buyerForm.city}, ${buyerForm.country} ${buyerForm.postalCode}`],
+              ['Category / product', `${form.productCategory} · ${form.productName}`],
+              ['Yarn', `${form.yarnType}${form.yarnSubtype ? ` / ${form.yarnSubtype}` : ''}`],
+              ['Product code', form.productCode || 'Not provided'],
+              ['Composition', form.materialComposition || 'Not provided'],
+              ['Technical specifications', form.technicalSpecifications || 'Not provided'],
+              ['Denier / count', form.denierCount || 'Not applicable'],
+              ['Colour / shade', form.shade || 'Not provided'],
+              ['Special requirements', form.specialRequirements || 'None'],
+              ['Quantity', `${form.quantity} ${form.unit} · ${form.priority} priority`],
+              ['Requested delivery', form.requestedDeliveryDate || 'Not specified'],
+              ['Delivery address', form.deliveryAddress || 'Not provided'],
+              ['Delivery instructions', form.deliveryInstructions || 'None'],
+              ['Target price / quotation', form.targetPrice || 'Please provide a quotation'],
+              ['Buyer notes', form.buyerNotes || 'None'],
+            ].map(([label, value]) => (
+              <div key={label} className="rounded-xl bg-canvas p-3">
+                <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt>
+                <dd className="mt-1 whitespace-pre-wrap text-sm text-ink">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted">Creating the order sets its status to <strong className="text-ink">Submitted</strong> and sends it to incoming order review. Material availability remains unchecked until Ram records a check.</p>
+          {error ? <p role="alert" className="mt-4 rounded-xl border border-error/40 bg-error/5 p-3 text-sm font-medium text-error">{error}</p> : null}
+          <div className="mt-5 flex flex-col-reverse justify-end gap-3 sm:flex-row">
+            <button type="button" onClick={() => setStep('form')} className={buttonClass('secondary', 'md')}>Edit requirements</button>
+            <button type="button" disabled={submitting} onClick={submitOrder} className={buttonClass('primary', 'md', 'disabled:cursor-not-allowed disabled:opacity-60')}>
+              {submitting ? 'Creating order…' : 'Create order'}
+            </button>
+          </div>
+          {submittedOrderId ? (
+            <p className="mt-3 text-sm text-muted">Created order <span className="font-semibold text-ink">{submittedOrderId}</span>. Redirecting…</p>
+          ) : null}
+        </section>
+      )}
     </div>
   )
 }
@@ -962,7 +1335,7 @@ export function AdminOrderReviewPage() {
           </section>
 
           <section className="rounded-2xl border border-line bg-surface p-5 shadow-card">
-            <h2 className="text-lg font-semibold text-ink">Maahi material availability</h2>
+            <h2 className="text-lg font-semibold text-ink">Material availability</h2>
             {material ? (
               <>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -1221,17 +1594,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function FieldInput({ label, value, onChange, type = 'text', textarea = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; textarea?: boolean }) {
-  return (
-    <label className="block">
-      <span className="mb-2 block text-sm font-medium text-ink">{label}</span>
-      {textarea ? (
-        <textarea value={value} onChange={(event) => onChange(event.target.value)} className="min-h-28 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm text-ink" />
-      ) : (
-        <input type={type} value={value} onChange={(event) => onChange(event.target.value)} className="h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm text-ink" />
-      )}
-    </label>
-  )
+function Field({ label, required, className = '', children }: { label: string; required?: boolean; className?: string; children: React.ReactNode }) {
+  return <label className={`block ${className}`}>  <span className="mb-2 block text-sm font-medium text-ink">{label}{required ? <span className="ml-1 text-error">*</span> : null}</span>{children}</label>
 }
 
 export default AdminRouteGuard

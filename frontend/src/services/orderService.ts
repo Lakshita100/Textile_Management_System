@@ -227,8 +227,11 @@ export const submitBuyerOrder = async (order: BuyerOrderDraft): Promise<OrderRec
 }
 
 export const createManualOrder = async (input: {
-  companyName: string; productName: string; productCode: string; quantity: number; unit: string;
-  requestedDeliveryDate: string; deliveryAddress: string; notes: string;
+  companyName: string; buyerName: string; buyerEmail: string; buyerPhone: string; productName: string; productCode: string; yarnId?: string;
+  productCategory: string; yarnType: string; yarnSubtype: string; materialComposition: string; technicalSpecifications: string;
+  denierCount: string; shade: string; specialRequirements: string; quantity: number; unit: string; priority: string;
+  requestedDeliveryDate: string; deliveryAddress: string; deliveryInstructions: string; targetPrice: string; buyerNotes: string;
+  technicalNotes: string; commercialNotes: string;
 }): Promise<OrderRecord> => {
   const created = await http.post<OrderRecord>('/orders/manual', input)
   writeStored(STORAGE_KEYS.orders, [created, ...getAllOrders()])
