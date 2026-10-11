@@ -1,6 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Navigate, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, ArrowRight, Bell, CheckCircle2, ChevronDown, ChevronRight, ClipboardList, FileText, PackageCheck, Search, ShieldCheck, Truck } from 'lucide-react'
+import {
+  AlertCircle,
+  ArrowRight,
+  Bell,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ClipboardList,
+  FileText,
+  LogOut,
+  Menu,
+  PackageCheck,
+  Search,
+  ShieldCheck,
+  Truck,
+} from 'lucide-react'
 import { buttonClass } from '../components/ui/Button'
 import { useAuth } from '../store/AuthProvider'
 import {
@@ -23,32 +38,53 @@ interface AdminNavItem {
   children?: { to: string; label: string }[];
 }
 
-const adminNav: AdminNavItem[] = [
-  { to: '/admin', label: 'Overview', end: true },
-  { to: '/admin/orders', label: 'All Orders', end: false },
-  { to: '/admin/incoming', label: 'Incoming Orders', end: false },
-  { to: '/admin/manual-order', label: 'Create Manual Order', end: false },
-  { to: '/admin/inquiries', label: 'Order Inquiries', end: false },
-  { to: '/admin/employees', label: 'Employee Access', end: false },
-  { to: '/admin/attendance', label: 'Attendance Register', end: false },
+const adminNavSections: ReadonlyArray<{
+  title: string
+  items: ReadonlyArray<AdminNavItem>
+}> = [
   {
-    label: 'Production Management',
-    to: '/admin/production',
-    children: [
-      { to: '/admin/inventory', label: 'Yarn Inventory' },
-      { to: '/admin/alerts', label: 'Low-Stock Alerts' },
-      { to: '/admin/movements', label: 'Stock Movements' },
-      { to: '/admin/suppliers', label: 'Suppliers' },
+    title: 'OVERVIEW',
+    items: [{ to: '/admin', label: 'Dashboard', end: true }],
+  },
+  {
+    title: 'ORDER MANAGEMENT',
+    items: [
+      { to: '/admin/incoming', label: 'Incoming Orders', end: false },
+      { to: '/admin/orders', label: 'All Orders', end: false },
+      { to: '/admin/manual-order', label: 'Create Manual Order', end: false },
+      { to: '/admin/inquiries', label: 'Order Inquiries', end: false },
     ],
   },
-  { to: '/admin/machines', label: 'Machine Management', end: false },
-  { to: '/admin/jobs', label: 'Production Jobs', end: false },
-  { to: '/admin/recommend', label: 'Machine Recommendations', end: false },
-  { to: '/admin/quality', label: 'Quality Management', end: false },
-  { to: '/admin/dispatch', label: 'Dispatch & Delivery', end: false },
+  {
+    title: 'INVENTORY & OPERATIONS',
+    items: [
+      {
+        label: 'Production Management',
+        to: '/admin/production',
+        children: [
+          { to: '/admin/inventory', label: 'Yarn Inventory' },
+          { to: '/admin/alerts', label: 'Low-Stock Alerts' },
+          { to: '/admin/movements', label: 'Stock Movements' },
+          { to: '/admin/suppliers', label: 'Suppliers' },
+        ],
+      },
+      { to: '/admin/machines', label: 'Machines', end: false },
+      { to: '/admin/jobs', label: 'Production Jobs', end: false },
+      { to: '/admin/recommend', label: 'Production Recommendations', end: false },
+      { to: '/admin/quality', label: 'Quality Control', end: false },
+      { to: '/admin/dispatch', label: 'Packing & Dispatch', end: false },
+    ],
+  },
+  {
+    title: 'TEAM & ATTENDANCE',
+    items: [
+      { to: '/admin/employees', label: 'Employee Access', end: false },
+      { to: '/admin/attendance', label: 'Attendance Register', end: false },
+    ],
+  },
 ]
 
-export function AdminRouteGuard() {
+export function AdminRouteGuard({ children }: { children?: React.ReactNode }) {
   const { user, loading } = useAuth()
 
   if (loading) {
@@ -69,7 +105,7 @@ export function AdminRouteGuard() {
     return <Navigate to={user.role === 'buyer' ? '/buyer' : '/dashboard'} replace />
   }
 
-  return <AdminPanelLayout />
+  return children ?? <AdminPanelLayout />
 }
 
 export function AdminPanelLayout() {
@@ -89,108 +125,177 @@ export function AdminPanelLayout() {
     setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }))
   }
 
+  const activeLabel =
+    adminNavSections
+      .flatMap((group) => group.items.flatMap((item) => (item.children ? [item, ...item.children] : [item])))
+      .find((item) => item.to && ('end' in item && item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)))
+      ?.label ?? 'Dashboard'
+
+  useEffect(() => {
+    if (location.pathname === '/admin/manual-order') {
+      const current = getAllOrders()
+      const existing = current.find((order) => order.source === 'Manual' && order.status === 'Submitted' && order.companyName === 'Manual buyer')
+      if (existing) {
+        localStorage.setItem('everest-admin-last-location', '/admin/incoming')
+      }
+    }
+  }, [location.pathname])
+
   return (
-    <div className="min-h-screen bg-canvas text-ink">
-      <div className="flex min-h-screen flex-col xl:flex-row">
-        <aside className="border-b border-line bg-surface xl:w-72 xl:border-b-0 xl:border-r">
-          <div className="border-b border-line px-5 py-4">
-            <p className="font-display text-xl font-bold text-primary">Everest Admin</p>
-            <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-muted">Factory management</p>
+    <div className="admin-panel min-h-screen bg-[#edf3f8] text-slate-800">
+      <div className="relative min-h-screen xl:pl-[260px]">
+        <aside className="fixed left-0 top-0 z-30 h-screen w-full text-white xl:w-[260px] xl:border-r xl:border-slate-700" style={{ background: 'var(--admin-sidebar-bg)' }}>
+          <div className="flex items-center gap-3 border-b border-slate-700 px-5 py-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#1b4a8a] text-lg font-extrabold text-white">E</div>
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white">EVEREST</p>
+              <p className="text-[9px] font-medium uppercase tracking-[0.22em] text-slate-300">TEXTILE MILLS</p>
+            </div>
           </div>
 
-          <nav className="flex flex-col gap-1 p-3" aria-label="Admin navigation">
-            {adminNav.map((item) => {
-              if (item.children && item.children.length > 0) {
-                const isExpanded = !!expandedGroups[item.label]
-                const isChildActive = item.children.some((c) => location.pathname.startsWith(c.to))
-                const isParentActive = item.to ? location.pathname === item.to || isChildActive : isChildActive
+          <nav className="flex h-[calc(100vh-140px)] flex-col gap-5 overflow-y-auto px-3 py-4" aria-label="Admin navigation">
+            {adminNavSections.map((section) => (
+              <div key={section.title}>
+                <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">{section.title}</p>
+                <div className="space-y-1">
+                  {section.items.map((item) => {
+                    if (item.children && item.children.length > 0) {
+                      const isExpanded = !!expandedGroups[item.label]
+                      const isChildActive = item.children.some((c) => location.pathname.startsWith(c.to))
+                      const isParentActive = item.to ? location.pathname === item.to || isChildActive : isChildActive
 
-                return (
-                  <div key={item.label} className="space-y-1">
-                    <div className="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition hover:bg-canvas">
+                      return (
+                        <div key={item.label} className="space-y-1">
+                          <div
+                            className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                              isParentActive ? 'bg-[#0f2d5b] text-white shadow-inner' : 'text-slate-200 hover:bg-[#102749] hover:text-white'
+                            }`}
+                          >
+                            <NavLink
+                              to={item.to!}
+                              className="flex flex-1 items-center gap-2.5 font-semibold text-slate-100"
+                            >
+                              <ArrowRight className={`h-4 w-4 ${isParentActive ? 'text-white' : 'text-sky-300'}`} />
+                              <span>{item.label}</span>
+                            </NavLink>
+                            <button
+                              type="button"
+                              onClick={() => toggleGroup(item.label)}
+                              className="p-1 text-slate-300 hover:text-white"
+                              aria-label="Toggle sub-modules"
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="ml-4 space-y-1 border-l border-slate-600 pl-2">
+                              {item.children.map((child) => (
+                                <NavLink
+                                  key={child.to}
+                                  to={child.to}
+                                  className={({ isActive }) =>
+                                    `block rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                                      isActive
+                                        ? 'bg-sky-600 text-white font-semibold shadow-sm'
+                                        : 'text-slate-300 hover:bg-[#102749] hover:text-white'
+                                    }`
+                                  }
+                                >
+                                  {child.label}
+                                </NavLink>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    return (
                       <NavLink
+                        key={`${section.title}-${item.to}`}
                         to={item.to!}
-                        className={() =>
-                          `flex-1 font-semibold transition ${
-                            isParentActive ? 'text-primary' : 'text-ink hover:text-primary'
+                        end={item.end}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'bg-[#0f2d5b] text-white shadow-inner'
+                              : 'text-slate-200 hover:bg-[#102749] hover:text-white'
                           }`
                         }
                       >
-                        {item.label}
+                        {({ isActive }) => (
+                          <>
+                            <ArrowRight className={`h-4 w-4 ${isActive ? 'text-white' : 'text-sky-300'}`} />
+                            <span>{item.label}</span>
+                          </>
+                        )}
                       </NavLink>
-                      <button
-                        type="button"
-                        onClick={() => toggleGroup(item.label)}
-                        className="p-1 text-muted hover:text-primary"
-                        aria-label="Toggle sub-modules"
-                      >
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </button>
-                    </div>
-
-                    {isExpanded && (
-                      <div className="ml-3 border-l border-line pl-2 space-y-1">
-                        {item.children.map((child) => (
-                          <NavLink
-                            key={child.to}
-                            to={child.to}
-                            className={({ isActive }) =>
-                              `block rounded-lg px-3 py-2 text-xs font-medium transition ${
-                                isActive ? 'bg-primary text-white font-semibold' : 'text-muted hover:bg-canvas hover:text-primary'
-                              }`
-                            }
-                          >
-                            {child.label}
-                          </NavLink>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )
-              }
-
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to!}
-                  end={item.end}
-                  className={({ isActive }) =>
-                    `rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                      isActive ? 'bg-primary text-white' : 'text-muted hover:bg-canvas hover:text-primary'
-                    }`
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              )
-            })}
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
           </nav>
 
-          <div className="mt-auto border-t border-line p-4">
-            <p className="text-xs uppercase tracking-[0.18em] text-muted">Signed in</p>
-            <p className="mt-2 text-sm font-semibold text-ink">{session?.name ?? 'Admin user'}</p>
-            <button type="button" onClick={handleLogout} className="mt-3 w-full rounded-xl border border-line bg-canvas px-3 py-2 text-sm font-medium text-ink">
-              Logout
-            </button>
+          <div className="relative border-t border-slate-700 p-4">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between rounded-xl border border-white/15 bg-[#0d2347]/80 px-3 py-2 text-left transition hover:bg-[#0d2347] [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f0f4f8] text-[10px] font-bold text-slate-800">FA</span>
+                  <span>
+                    <span className="block text-sm font-semibold text-white">{session?.name ?? 'Factory Admin'}</span>
+                    <span className="block text-[9px] uppercase tracking-[0.18em] text-slate-300">Administrator</span>
+                  </span>
+                </span>
+                <ChevronDown className="h-4 w-4 text-slate-300 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="absolute bottom-full left-4 right-4 z-50 mb-2 rounded-xl border border-white/15 bg-[#0d2347] p-1.5 shadow-xl">
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-white transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                >
+                  <LogOut className="h-4 w-4 text-slate-300" aria-hidden />
+                  Logout
+                </button>
+              </div>
+            </details>
           </div>
         </aside>
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3 sm:px-6">
-            <div>
-              <p className="text-sm text-muted">Operations control</p>
-              <p className="text-xl font-semibold text-ink">Admin panel</p>
+        <div className="relative min-h-screen">
+          <header className="fixed left-0 right-0 top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 shadow-[0_1px_0_rgba(15,23,42,0.06)] sm:px-5 xl:left-[260px]">
+            <div className="flex min-w-0 items-center gap-3">
+              <button type="button" className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 xl:hidden" aria-label="Open navigation menu">
+                <Menu className="h-4 w-4" />
+              </button>
+              <div className="min-w-0">
+                <p className="text-[11px] font-medium uppercase tracking-[0.2em] text-slate-400">Operations control</p>
+                <p className="truncate text-xl font-semibold text-slate-800">{activeLabel}</p>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button type="button" className="rounded-xl border border-line bg-canvas p-2 text-muted" aria-label="Notifications">
+
+            <div className="flex items-center gap-3">
+              <div className="hidden items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 md:flex">
+                <Search className="h-4 w-4 text-slate-400" />
+                <input aria-label="Search orders" placeholder="Search orders, materials, machines, employees..." className="w-[260px] border-0 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none" />
+                <span className="rounded-md bg-slate-200 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-600">Ctrl K</span>
+              </div>
+              <button type="button" className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-600" aria-label="Theme settings">
                 <Bell className="h-4 w-4" />
               </button>
-              <Link to="/" className="text-sm font-medium text-primary">Website</Link>
+              <button type="button" className="rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-600" aria-label="Notifications">
+                <CheckCircle2 className="h-4 w-4" />
+              </button>
+              <Link to="/" className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">Website</Link>
             </div>
           </header>
 
-          <main className="flex-1 px-4 py-6 sm:px-6">
-            <Outlet />
+          <main className="min-h-screen bg-[#edf3f8] px-4 pb-6 pt-[88px] sm:px-6 xl:pl-6">
+            <div className="mx-auto max-w-[1550px]">
+              <Outlet />
+            </div>
           </main>
         </div>
       </div>
@@ -199,88 +304,233 @@ export function AdminPanelLayout() {
 }
 
 export function AdminOverviewPage() {
-  const { totalOrders, newRequests, awaitingReview, acceptedOrders, inProduction, qualityCheck, readyToDispatch, delayedOrders, recentOrders } = getAdminOverview()
+  const { totalOrders, newRequests, inProduction, qualityCheck, readyToDispatch, delayedOrders, recentOrders } = getAdminOverview()
 
-  const cards = [
-    { label: 'Total Orders', value: totalOrders, icon: ClipboardList },
-    { label: 'New Requests', value: newRequests, icon: FileText },
-    { label: 'Awaiting Review', value: awaitingReview, icon: AlertCircle },
-    { label: 'Accepted Orders', value: acceptedOrders, icon: CheckCircle2 },
-    { label: 'In Production', value: inProduction, icon: PackageCheck },
-    { label: 'Quality Check', value: qualityCheck, icon: ShieldCheck },
-    { label: 'Ready to Dispatch', value: readyToDispatch, icon: Truck },
-    { label: 'Delayed Orders', value: delayedOrders, icon: AlertCircle },
+  const kpis = [
+    { label: 'Total Orders', value: totalOrders, delta: '+12% from last month', tone: 'bg-[#f2f6ff] text-[#0f4ea3]', icon: ClipboardList },
+    { label: 'New Requests', value: newRequests, delta: '+3% from last week', tone: 'bg-[#f5f1ff] text-[#7c5af7]', icon: FileText },
+    { label: 'In Production', value: inProduction, delta: '+25% from last week', tone: 'bg-[#eafaf3] text-[#20a86b]', icon: PackageCheck },
+    { label: 'Quality Check', value: qualityCheck, delta: '+18% from last week', tone: 'bg-[#eefaf5] text-[#1ba973]', icon: ShieldCheck },
+    { label: 'Ready to Dispatch', value: readyToDispatch, delta: '+33% from last week', tone: 'bg-[#edf4ff] text-[#1767d3]', icon: Truck },
+    { label: 'Delayed Orders', value: delayedOrders, delta: '+2% from last week', tone: 'bg-[#fff2f2] text-[#e95b5b]', icon: AlertCircle },
+  ]
+
+  const chartPoints = [50, 80, 90, 120, 140, 180, 220]
+  const chartHeight = 176
+  const chartWidth = 360
+  const chartMax = 260
+  const chartPath = chartPoints.map((point, index) => {
+    const x = 24 + index * 52
+    const y = chartHeight - (point / chartMax) * chartHeight + 10
+    return `${index === 0 ? 'M' : 'L'} ${x} ${y}`
+  }).join(' ')
+
+  const orderBreakdown = [
+    { label: 'Incoming', value: 12, color: '#3b82f6' },
+    { label: 'In Production', value: 18, color: '#22c55e' },
+    { label: 'Quality Check', value: 17, color: '#f59e0b' },
+    { label: 'Ready to Dispatch', value: 13, color: '#a855f7' },
+    { label: 'Delivered', value: 8, color: '#94a3b8' },
+  ]
+
+  const donutGradient = `conic-gradient(#3b82f6 0 12%, #22c55e 12% 30%, #f59e0b 30% 47%, #a855f7 47% 60%, #94a3b8 60% 68%, #f97316 68% 100%)`
+
+  const quickActions = [
+    { label: 'Create', icon: FileText },
+    { label: 'Add Manual Order', icon: ClipboardList },
+    { label: 'View All Orders', icon: Truck },
+    { label: 'Manage Machines', icon: PackageCheck },
+    { label: 'Production', icon: CheckCircle2 },
+    { label: 'Quality Control', icon: ShieldCheck },
+  ]
+
+  const alerts = [
+    { title: 'Low stock alert', detail: 'Cotton yarn stock is below threshold (500 kg).', time: '2h ago', color: 'bg-rose-100 text-rose-500', icon: AlertCircle },
+    { title: 'Order at risk', detail: 'ORD-2048 may be delayed by 2 days.', time: '4h ago', color: 'bg-amber-100 text-amber-500', icon: AlertCircle },
+    { title: 'Machine maintenance', detail: 'Machine M-03 scheduled maintenance due.', time: '5h ago', color: 'bg-sky-100 text-sky-600', icon: CheckCircle2 },
+    { title: 'Quality issue', detail: '2 batches failed quality check.', time: '6h ago', color: 'bg-emerald-100 text-emerald-600', icon: ShieldCheck },
+    { title: 'Dispatch ready', detail: '3 orders are ready for dispatch.', time: '8h ago', color: 'bg-violet-100 text-violet-600', icon: Truck },
   ]
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-line bg-gradient-to-r from-slate-900 via-primary to-sky-700 p-6 text-white">
-        <p className="text-sm uppercase tracking-[0.2em] text-white/70">Operations overview</p>
-        <h1 className="mt-2 font-display text-3xl font-bold">Everest Textile Mills</h1>
-        <p className="mt-2 max-w-xl text-sm text-white/80">Monitor current work, incoming orders and progress across all order-linked operational teams.</p>
+      <section className="rounded-[18px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(94,130,216,0.28),_transparent_22%),linear-gradient(90deg,#0c254d_0%,#0f3d7c_48%,#0f3d7c_100%)] p-5 text-white shadow-sm md:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="max-w-[680px] flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-200">Operations overview</p>
+            <h1 className="mt-3 text-3xl font-bold tracking-tight text-white md:text-[40px]">Everest Textile Mills</h1>
+            <p className="mt-2 max-w-[560px] text-sm text-slate-200 md:text-base">Monitor current work, incoming orders and progress across all order-linked operational teams.</p>
+          </div>
+          <div className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-white/95 backdrop-blur-sm">
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+            Factory Operational
+          </div>
+        </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {cards.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="rounded-2xl border border-line bg-surface p-4 shadow-card">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted">{label}</p>
-              <div className="rounded-xl bg-primary/5 p-2 text-primary"><Icon className="h-4 w-4" /></div>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {kpis.map(({ label, value, delta, tone, icon: Icon }) => (
+          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}>
+                <Icon className="h-5 w-5" />
+              </div>
             </div>
-            <p className="mt-5 text-3xl font-bold text-ink">{value}</p>
+            <div className="mt-5 flex items-end justify-between gap-3">
+              <div>
+                <p className="text-sm text-slate-500">{label}</p>
+                <p className="mt-2 text-3xl font-bold text-slate-900">{value}</p>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2 text-xs font-medium text-emerald-600">
+              <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              {delta}
+            </div>
           </div>
         ))}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-ink">Recent orders</h2>
-            <Link to="/admin/orders" className="text-sm font-semibold text-primary">Open register</Link>
+      <section className="grid gap-6 xl:grid-cols-[1.5fr_0.7fr_0.75fr]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg text-slate-700">📈</span>
+              <h2 className="text-xl font-semibold text-slate-800">Production Progress</h2>
+            </div>
+            <button type="button" className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500">This Week</button>
           </div>
-          <div className="space-y-3">
-            {recentOrders.map((order) => (
-              <div key={order.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">
-                <div>
-                  <p className="font-semibold text-ink">{order.id}</p>
-                  <p className="text-sm text-muted">{order.companyName}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-ink">{order.status}</p>
-                  <p className="text-xs text-muted">{new Date(order.updatedAt).toLocaleDateString()}</p>
-                </div>
-              </div>
-            ))}
+
+          <div className="mb-3 flex items-center gap-4 text-xs text-slate-500">
+            <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-blue-600" />Production Output</span>
+            <span className="inline-flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-slate-300" />Target Output</span>
+          </div>
+
+          <div className="relative h-[220px] overflow-hidden rounded-xl bg-slate-50 p-3">
+            <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="h-full w-full" aria-label="Production progress chart">
+              {[0, 1, 2, 3].map((row) => (
+                <line key={row} x1="0" x2={chartWidth} y1={20 + row * 42} y2={20 + row * 42} stroke="#dfe7f1" strokeDasharray="4 6" />
+              ))}
+              <path d={chartPath} fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+              <path d={`${chartPath} L 310 170 L 24 170 Z`} fill="rgba(37, 99, 235, 0.08)" />
+            </svg>
+            <div className="pointer-events-none absolute inset-x-3 bottom-3 flex justify-between text-[10px] font-medium uppercase tracking-wide text-slate-500">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => <span key={day}>{day}</span>)}
+            </div>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
-          <h2 className="text-lg font-semibold text-ink">Shortcuts</h2>
-          <div className="mt-4 space-y-3">
-            <Link to="/admin/incoming" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
-              Incoming Orders <ArrowRight className="h-4 w-4 text-primary" />
-            </Link>
-            <Link to="/admin/manual-order" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
-              Create Manual Order <ArrowRight className="h-4 w-4 text-primary" />
-            </Link>
-            <Link to="/admin/orders" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
-              All Orders <ArrowRight className="h-4 w-4 text-primary" />
-            </Link>
-            <Link to="/admin/materials" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
-              Raw Materials <ArrowRight className="h-4 w-4 text-primary" />
-            </Link>
-            <Link to="/admin/production" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
-              Production Dashboard <ArrowRight className="h-4 w-4 text-primary" />
-            </Link>
-            <Link to="/admin/machines" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
-              Machine Management <ArrowRight className="h-4 w-4 text-primary" />
-            </Link>
-            <Link to="/admin/employees" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
-              Employee Access <ArrowRight className="h-4 w-4 text-primary" />
-            </Link>
-            <Link to="/admin/attendance" className="flex items-center justify-between rounded-xl border border-line p-3 text-sm font-medium text-ink">
-              Attendance Register <ArrowRight className="h-4 w-4 text-primary" />
-            </Link>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-lg text-slate-700">🧭</span>
+            <h2 className="text-xl font-semibold text-slate-800">Order Status Distribution</h2>
+          </div>
+
+          <div className="flex items-center gap-5">
+            <div className="relative flex h-36 w-36 items-center justify-center rounded-full" style={{ background: donutGradient }}>
+              <div className="flex h-[95px] w-[95px] items-center justify-center rounded-full bg-white text-center shadow-inner">
+                <div>
+                  <div className="text-2xl font-bold text-slate-800">48</div>
+                  <div className="text-[10px] uppercase tracking-[0.14em] text-slate-400">Total Orders</div>
+                </div>
+              </div>
+            </div>
+
+            <ul className="flex-1 space-y-2 text-sm text-slate-700">
+              {orderBreakdown.map((item) => (
+                <li key={item.label} className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ background: item.color }} />{item.label}</span>
+                  <span className="font-semibold text-slate-800">{item.value}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-lg text-slate-700">⚡</span>
+            <h2 className="text-xl font-semibold text-slate-800">Quick Actions</h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            {quickActions.map(({ label, icon: Icon }) => (
+              <button key={label} type="button" className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:bg-slate-100">
+                <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="text-sm font-medium text-slate-700">{label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.5fr_0.8fr]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg text-slate-700">🧾</span>
+              <h2 className="text-xl font-semibold text-slate-800">Recent Orders</h2>
+            </div>
+            <Link to="/admin/orders" className="text-sm font-semibold text-blue-600">View All</Link>
+          </div>
+
+          <div className="overflow-hidden rounded-xl border border-slate-200">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-slate-50 text-slate-500">
+                <tr>
+                  <th className="px-3 py-3 font-medium">Order No.</th>
+                  <th className="px-3 py-3 font-medium">Customer</th>
+                  <th className="px-3 py-3 font-medium">Product</th>
+                  <th className="px-3 py-3 font-medium">Quantity</th>
+                  <th className="px-3 py-3 font-medium">Status</th>
+                  <th className="px-3 py-3 font-medium">Expected Date</th>
+                  <th className="px-3 py-3 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentOrders.slice(0, 5).map((order) => (
+                  <tr key={order.id} className="border-t border-slate-200 bg-white">
+                    <td className="px-3 py-3 font-semibold text-slate-800">{order.id}</td>
+                    <td className="px-3 py-3 text-slate-600">{order.companyName}</td>
+                    <td className="px-3 py-3 text-slate-600">{order.productName}</td>
+                    <td className="px-3 py-3 text-slate-600">{order.quantity.toLocaleString()}</td>
+                    <td className="px-3 py-3">
+                      <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700">{order.status}</span>
+                    </td>
+                    <td className="px-3 py-3 text-slate-600">{new Date(order.requestedDeliveryDate).toLocaleDateString('en-GB')}</td>
+                    <td className="px-3 py-3 text-center text-slate-400">•••</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-lg text-slate-700">🔔</span>
+              <h2 className="text-xl font-semibold text-slate-800">Alerts & Notifications</h2>
+            </div>
+            <Link to="/admin/alerts" className="text-sm font-semibold text-blue-600">View All</Link>
+          </div>
+
+          <div className="space-y-3">
+            {alerts.map(({ title, detail, time, color, icon: Icon }) => (
+              <div key={title} className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+                <div className={`mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg ${color}`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-slate-800">{title}</p>
+                    <span className="text-[10px] text-slate-400">{time}</span>
+                  </div>
+                  <p className="mt-1 text-sm text-slate-600">{detail}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -405,19 +655,19 @@ export function AdminManualOrderPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+    <div className="space-y-4">
+      <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
         <h1 className="text-2xl font-bold text-ink">Create Manual Order</h1>
         <p className="mt-1 text-sm text-muted">Capture buyer or offline orders into the central order register.</p>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
-          <div className="grid gap-4">
+      <div className="grid gap-5 lg:grid-cols-[1.5fr_0.9fr]">
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
+          <div className="grid gap-3">
             <FieldInput label="Buyer/company" value={form.buyerCompany} onChange={(value) => setForm({ ...form, buyerCompany: value })} />
             <FieldInput label="Product name" value={form.productName} onChange={(value) => setForm({ ...form, productName: value })} />
             <FieldInput label="Product code" value={form.productCode} onChange={(value) => setForm({ ...form, productCode: value })} />
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               <FieldInput label="Quantity" value={form.quantity} onChange={(value) => setForm({ ...form, quantity: value })} />
               <FieldInput label="Unit" value={form.unit} onChange={(value) => setForm({ ...form, unit: value })} />
             </div>
@@ -425,13 +675,13 @@ export function AdminManualOrderPage() {
             <FieldInput label="Delivery address" value={form.deliveryAddress} onChange={(value) => setForm({ ...form, deliveryAddress: value })} />
             <FieldInput label="Notes" value={form.notes} onChange={(value) => setForm({ ...form, notes: value })} textarea />
           </div>
-          <div className="mt-5 flex justify-end gap-2">
+          <div className="mt-4 flex justify-end gap-2">
             <button type="button" className={buttonClass('secondary', 'md')}>Save draft</button>
             <button type="button" onClick={handleCreate} className={buttonClass('primary', 'md')}>Submit order</button>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
+        <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
           <h2 className="text-lg font-semibold text-ink">Submission summary</h2>
           <div className="mt-4 space-y-3 text-sm text-muted">
             <p><span className="font-medium text-ink">Buyer:</span> {form.buyerCompany || 'Not provided'}</p>

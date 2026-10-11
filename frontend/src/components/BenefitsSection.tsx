@@ -11,7 +11,7 @@ const BENEFIT_ICONS = {
 
 export function BenefitsSection() {
   return (
-    <section id="benefits" className="scroll-mt-24 bg-canvas py-20 lg:py-28">
+    <section id="benefits" className="scroll-mt-24 bg-surface py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
           <div className="reveal">
@@ -25,7 +25,7 @@ export function BenefitsSection() {
               />
               <div
                 aria-hidden
-                className="absolute -bottom-4 -right-4 hidden rounded-xl border border-line bg-surface px-5 py-4 shadow-elevated sm:block"
+                className="absolute -bottom-4 -right-4 hidden rounded-xl border border-line bg-white px-5 py-4 shadow-elevated sm:block"
               >
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-accent">
                   End-to-end

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Menu, X } from 'lucide-react';
+import { ArrowRight, Menu, X, Search } from 'lucide-react';
 import { Logo } from './Logo';
 import { buttonClass } from './ui/Button';
 import { cx } from '../utils/cx';
@@ -29,17 +29,17 @@ export function Header() {
   }, [menuOpen]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-line bg-surface">
-      <div className="mx-auto flex h-[84px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-[92px] lg:gap-5 lg:px-8 xl:gap-8">
+    <header className="sticky top-0 z-50 border-b border-line bg-white">
+      <div className="mx-auto flex h-[80px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:gap-6 lg:px-8 xl:gap-8">
         <a
           href="#home"
           className="shrink-0 rounded-md py-1"
           aria-label="Everest Textile Mills — back to top"
         >
-          <Logo />
+          <Logo variant="dark" showTagline={true} />
         </a>
 
-        <nav aria-label="Primary" className="hidden lg:block">
+        <nav aria-label="Primary" className="hidden lg:block flex-1 flex justify-center">
           <ul className="flex items-center gap-1">
             {NAV_ITEMS.map((item) => {
               const active = activeId === item.id;
@@ -49,10 +49,10 @@ export function Header() {
                     href={`#${item.id}`}
                     aria-current={active ? 'true' : undefined}
                     className={cx(
-                      'relative block rounded-md px-3 py-2 text-sm transition-colors xl:px-4',
+                      'relative block rounded-md px-3 py-2 text-sm font-medium transition-colors',
                       active
-                        ? 'font-semibold text-ink'
-                        : 'font-medium text-muted hover:text-primary',
+                        ? 'text-primary'
+                        : 'text-ink hover:text-primary',
                     )}
                   >
                     {item.label}
@@ -70,13 +70,15 @@ export function Header() {
           </ul>
         </nav>
 
-        <div className="hidden shrink-0 items-center gap-3 lg:flex">
-          <Link
-            to="/login"
-            className={buttonClass('secondary', 'md', 'hidden xl:inline-flex')}
+        <div className="hidden shrink-0 items-center gap-4 lg:flex">
+          <button
+            type="button"
+            className="inline-flex size-10 items-center justify-center rounded-lg border border-line text-muted transition-colors hover:border-primary hover:text-primary"
+            aria-label="Search"
           >
-            Sign In
-          </Link>
+            <Search className="size-4.5" />
+          </button>
+          <span className="hidden h-6 w-px bg-line lg:block" aria-hidden="true" />
           <Link to="/signup" className={buttonClass('primary', 'md')}>
             Get Started
             <ArrowRight aria-hidden className="size-4" />
@@ -85,7 +87,7 @@ export function Header() {
 
         <button
           type="button"
-          className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-line text-ink transition-colors hover:border-primary hover:text-primary lg:hidden"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-line text-ink transition-colors hover:border-primary hover:text-primary lg:hidden"
           aria-expanded={menuOpen}
           aria-controls="mobile-nav"
           onClick={() => setMenuOpen((open) => !open)}
@@ -102,7 +104,7 @@ export function Header() {
       <div
         id="mobile-nav"
         hidden={!menuOpen}
-        className="border-t border-line bg-surface lg:hidden"
+        className="border-t border-line bg-white lg:hidden"
       >
         <nav aria-label="Mobile" className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
           <ul className="flex flex-col gap-1">
@@ -118,7 +120,7 @@ export function Header() {
                       'flex min-h-11 items-center rounded-lg px-3 text-base font-medium transition-colors',
                       active
                         ? 'bg-primary/10 text-primary'
-                        : 'text-muted hover:bg-canvas hover:text-primary',
+                        : 'text-muted hover:bg-surface hover:text-primary',
                     )}
                   >
                     {item.label}

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CircleAlert, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { Logo } from '../components/Logo';
+import { CircleAlert, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { buttonClass } from '../components/ui/Button';
 import GoogleSignInButton from '../components/auth/GoogleSignInButton';
+import AuthPageShell from '../components/auth/AuthPageShell';
 import { useAuth } from '../store/AuthProvider';
 import { homePathForUser } from '../services/authService';
 import { errorMessage } from '../services/http';
@@ -96,25 +96,11 @@ export default function SignUpPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-canvas">
-      <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex h-[72px] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link to="/" aria-label="Everest Textile Mills — home">
-            <Logo />
-          </Link>
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-primary"
-          >
-            <ArrowLeft aria-hidden className="size-4" />
-            Back to home
-          </Link>
-        </div>
-      </header>
-
-      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
-        <div className="w-full max-w-lg">
-          <div className="rounded-2xl border border-line bg-surface p-8 shadow-card">
+    <AuthPageShell
+      eyebrow="BUYER REGISTRATION"
+      heading="Start your next order with confidence."
+      description="Create your buyer workspace to place textile orders and follow every update from production to delivery."
+    >
             <h1 className="font-display text-2xl font-extrabold text-ink">
               Create your account
             </h1>
@@ -297,7 +283,6 @@ export default function SignUpPage() {
             </form>
             <div className="my-5 flex items-center gap-3 text-xs text-muted"><span className="h-px flex-1 bg-line" />or sign up with Google<span className="h-px flex-1 bg-line" /></div>
             <GoogleSignInButton onCredential={handleGoogleCredential} />
-          </div>
 
           <p className="mt-6 text-center text-xs text-muted">
             Already have an account?{' '}
@@ -305,8 +290,6 @@ export default function SignUpPage() {
               Sign in
             </Link>
           </p>
-        </div>
-      </main>
-    </div>
+    </AuthPageShell>
   );
 }

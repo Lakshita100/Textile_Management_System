@@ -1,12 +1,20 @@
-import { useMemo, useState } from 'react'
-import { Link, Navigate, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowRight,
+  ArrowUpRight,
   BadgeCheck,
   Bell,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
   ClipboardCheck,
+  Clock3,
   Factory,
+  LayoutDashboard,
+  LogOut,
   MapPin,
+  Menu,
   Package,
   Search,
   Settings,
@@ -25,7 +33,7 @@ import {
 } from '../services/orderService'
 
 const navItems = [
-  { to: '/buyer', label: 'Dashboard', icon: Factory, end: true },
+  { to: '/buyer', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/buyer/orders', label: 'My Orders', icon: Package, end: false },
   { to: '/buyer/tracking', label: 'Tracking', icon: Truck, end: false },
   { to: '/buyer/inquiries', label: 'Inquiries', icon: ClipboardCheck, end: false },
@@ -64,90 +72,135 @@ export function BuyerRouteGuard() {
 export function BuyerPortalLayout() {
   const session = getCurrentSession()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const { signOut } = useAuth()
   const handleLogout = () => {
     void signOut().finally(() => navigate('/login'))
   }
-
-  return (
-    <div className="min-h-screen bg-canvas text-ink">
-      <div className="flex min-h-screen flex-col lg:flex-row">
-        <aside className="border-b border-line bg-surface lg:w-72 lg:border-b-0 lg:border-r">
-          <div className="border-b border-line px-5 py-4">
-            <p className="font-display text-xl font-bold text-primary">Everest Buyer Portal</p>
-            <p className="mt-1 text-xs font-medium uppercase tracking-[0.18em] text-muted">Textile procurement</p>
-          </div>
-
-          <nav className="flex flex-col gap-1 p-3" aria-label="Buyer navigation">
-            {navItems.map(({ to, label, icon: Icon, end }) => (
-              <NavLink
-                key={to}
-                to={to}
-                end={end}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
-                    isActive ? 'bg-primary text-white shadow-sm' : 'text-muted hover:bg-canvas hover:text-primary'
-                  }`
-                }
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </NavLink>
-            ))}
-          </nav>
-
-          <div className="mt-auto border-t border-line p-4">
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-muted">Signed in</p>
-              <p className="mt-2 text-sm font-semibold text-ink">{session?.name ?? 'Buyer'}</p>
-              <p className="text-xs text-muted">{session?.companyName ?? 'Company'}</p>
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="mt-3 w-full rounded-lg border border-line bg-surface px-3 py-1.5 text-xs font-semibold text-muted transition hover:border-primary hover:text-primary"
-              >
-                Log out
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-line bg-surface px-4 py-3 sm:px-6">
-            <div>
-              <p className="text-sm font-medium text-muted">Buyer workspace</p>
-              <p className="text-xl font-semibold text-ink">Welcome back</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button type="button" className="rounded-xl border border-line bg-canvas p-2 text-muted" aria-label="Notifications">
-                <Bell className="h-4 w-4" />
-              </button>
-              <Link to="/" className="text-sm font-medium text-primary">Back to website</Link>
-            </div>
-          </header>
-
-          <main className="flex-1 px-4 py-6 sm:px-6">
-            <Outlet />
-          </main>
-        </div>
-      </div>
-    </div>
+  const currentPage = navItems.find(({ to, end }) =>
+    end ? location.pathname === to : location.pathname.startsWith(to),
   )
-}
 
-function StatCard({ label, value, tone = 'primary' }: { label: string; value: string; tone?: 'primary' | 'success' | 'warning' | 'muted' }) {
-  const tones = {
-    primary: 'bg-primary/5 text-primary',
-    success: 'bg-success/10 text-success',
-    warning: 'bg-warning/10 text-warning',
-    muted: 'bg-slate-100 text-slate-700',
-  }
+  useEffect(() => {
+    setSidebarOpen(false)
+  }, [location.pathname])
 
   return (
-    <div className="rounded-2xl border border-line bg-surface p-4 shadow-card">
-      <div className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>{label}</div>
-      <p className="mt-4 text-2xl font-bold text-ink">{value}</p>
+    <div className="admin-layout min-h-screen">
+      {sidebarOpen && (
+        <button
+          type="button"
+          className="fixed inset-0 z-[99] bg-black/40 min-[1025px]:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close navigation menu"
+        />
+      )}
+
+      <aside
+        className={`admin-layout__sidebar flex flex-col transition-transform duration-200 ${sidebarOpen ? 'admin-layout__sidebar--open' : ''}`}
+        aria-label="Buyer navigation"
+      >
+        <div className="flex h-16 shrink-0 items-center gap-3 border-b border-[var(--admin-sidebar-border)] px-5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--admin-primary)]">
+            <Factory className="h-5 w-5 text-white" aria-hidden />
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-base font-bold text-[var(--admin-sidebar-text)]">Everest Textile Mills</p>
+            <p className="truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--admin-sidebar-text-muted)]">Buyer Portal</p>
+          </div>
+        </div>
+
+        <nav className="admin-layout__sidebar-nav flex-1 overflow-y-auto px-3 py-5" aria-label="Buyer modules">
+          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--admin-sidebar-text-muted)]">Workspace</p>
+          <ul className="space-y-1">
+            {navItems.map(({ to, label, icon: Icon, end }) => (
+              <li key={to}>
+                <NavLink
+                  to={to}
+                  end={end}
+                  className={({ isActive }) =>
+                    `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'bg-[var(--admin-sidebar-active-bg)] text-white'
+                        : 'text-[var(--admin-sidebar-text)] hover:bg-[var(--admin-sidebar-hover-bg)]'
+                    }`
+                  }
+                >
+                  <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+                  <span className="truncate">{label}</span>
+                  <ChevronRight className="ml-auto h-4 w-4 opacity-50" aria-hidden />
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        <div className="border-t border-[var(--admin-sidebar-border)] p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white">
+              {(session?.name ?? 'Buyer').split(' ').map((name) => name[0]).join('').slice(0, 2)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-[var(--admin-sidebar-text)]">{session?.name ?? 'Buyer'}</p>
+              <p className="truncate text-xs text-[var(--admin-sidebar-text-muted)]">{session?.companyName ?? 'Company'}</p>
+            </div>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--admin-sidebar-text-muted)] transition hover:bg-[var(--admin-sidebar-hover-bg)] hover:text-white"
+              aria-label="Log out"
+              title="Log out"
+            >
+              <LogOut className="h-4 w-4" aria-hidden />
+              </button>
+          </div>
+        </div>
+      </aside>
+
+      <div className="flex min-w-0 flex-1 flex-col min-[1025px]:pl-[240px]">
+        <header className="admin-layout__header">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--admin-border)] bg-white text-[var(--admin-text-secondary)] transition hover:bg-slate-50 min-[1025px]:hidden"
+              aria-label="Open navigation menu"
+              aria-expanded={sidebarOpen}
+            >
+              <Menu className="h-5 w-5" aria-hidden />
+            </button>
+            <div className="min-w-0">
+              <nav className="mb-0.5 flex items-center gap-1.5 text-xs text-[var(--admin-text-muted)]" aria-label="Breadcrumb">
+                <span>Buyer workspace</span>
+                <ChevronRight className="h-3 w-3" aria-hidden />
+                <span className="truncate font-medium text-[var(--admin-text-primary)]">{currentPage?.label ?? 'Dashboard'}</span>
+              </nav>
+              <h1 className="truncate text-lg font-semibold text-[var(--admin-text-primary)]">{currentPage?.label ?? 'Dashboard'}</h1>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Link
+              to="/buyer/inquiries"
+              className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--admin-border)] bg-white text-[var(--admin-text-muted)] transition hover:bg-slate-50 hover:text-[var(--admin-text-primary)]"
+              aria-label="View inquiries"
+            >
+              <Bell className="h-5 w-5" aria-hidden />
+            </Link>
+            <Link to="/" className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-[var(--admin-primary)] transition hover:bg-blue-50 sm:flex">
+              Back to website
+              <ArrowUpRight className="h-4 w-4" aria-hidden />
+            </Link>
+          </div>
+        </header>
+
+        <main className="admin-layout__main !pt-4 flex-1">
+          <div className="mx-auto w-full max-w-[1600px]">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
@@ -156,69 +209,174 @@ export function BuyerDashboardPage() {
   const session = getCurrentSession()
   const orders = useMemo(() => getOrdersForBuyer(session?.userId ?? ''), [session])
   const inquiries = useMemo(() => getInquiriesForBuyer(session?.userId ?? ''), [session])
+  const dueOrders = orders
+    .filter((order) => order.requestedDeliveryDate && !['Delivered', 'Cancelled', 'Rejected'].includes(order.status))
+    .sort((a, b) => a.requestedDeliveryDate.localeCompare(b.requestedDeliveryDate))
+  const activeOrders = orders.filter((order) => !['Delivered', 'Cancelled', 'Rejected'].includes(order.status))
+  const inProduction = orders.filter((order) => ['In Production', 'Quality Check'].includes(order.status)).length
+  const openInquiries = inquiries.filter((inquiry) => inquiry.status !== 'Resolved')
+  const latestOrders = [...orders].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 4)
+  const greeting = new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 18 ? 'Good afternoon' : 'Good evening'
 
   const metrics = [
-    { label: 'Active orders', value: String(orders.length), tone: 'primary' as const },
-    { label: 'In production', value: String(orders.filter((order) => order.status === 'In Production').length), tone: 'success' as const },
-    { label: 'Due soon', value: String(orders.filter((order) => order.requestedDeliveryDate).length), tone: 'warning' as const },
-    { label: 'Open inquiries', value: String(inquiries.filter((inquiry) => inquiry.status !== 'Resolved').length), tone: 'muted' as const },
+    { label: 'Active orders', value: activeOrders.length, note: 'Orders currently being processed', icon: Package, tone: 'bg-[#f2f6ff] text-[#0f4ea3]' },
+    { label: 'In production', value: inProduction, note: 'Production and quality stages', icon: Factory, tone: 'bg-[#eafaf3] text-[#20a86b]' },
+    { label: 'Scheduled deliveries', value: dueOrders.length, note: 'Active orders with a delivery date', icon: Truck, tone: 'bg-[#fff7e8] text-[#d38b1f]' },
+    { label: 'Open inquiries', value: openInquiries.length, note: 'Conversations awaiting resolution', icon: ClipboardCheck, tone: 'bg-[#f5f1ff] text-[#7c5af7]' },
   ]
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-line bg-gradient-to-r from-primary/10 via-white to-cyan-50 p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary">Buyer dashboard</p>
-            <h1 className="mt-2 font-display text-3xl font-extrabold text-ink">{session?.companyName ?? 'Your textile orders'}</h1>
-            <p className="mt-2 max-w-xl text-sm text-muted">Track order progress, inquiries and delivery planning from one place.</p>
+    <div className="space-y-5">
+      <section className="relative overflow-hidden rounded-[18px] border border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(94,130,216,0.32),_transparent_28%),linear-gradient(100deg,#0c254d_0%,#0f3d7c_54%,#1457a4_100%)] p-5 text-white shadow-sm md:p-6">
+        <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border-[32px] border-white/5" />
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-100">{greeting}, {session?.name?.split(' ')[0] ?? 'Buyer'}</p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-white md:text-[38px]">{session?.companyName ?? 'Your buyer workspace'}</h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-blue-100">Your orders, production updates and delivery plans — all in one place.</p>
           </div>
-          <Link to="/buyer/orders/new" className={buttonClass('primary', 'md')}>
+          <Link to="/buyer/orders/new" className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[#124887] shadow-sm transition hover:bg-blue-50">
             Place a new order
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
-          <StatCard key={metric.label} label={metric.label} value={metric.value} tone={metric.tone} />
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Order summary">
+        {metrics.map(({ label, value, note, icon: Icon, tone }) => (
+          <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${tone}`}>
+                <Icon className="h-5 w-5" aria-hidden />
+              </div>
+              <span className="rounded-full bg-slate-50 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Overview</span>
+            </div>
+            <p className="mt-5 text-sm text-slate-500">{label}</p>
+            <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">{value}</p>
+            <p className="mt-2 text-xs text-slate-500">{note}</p>
+          </div>
         ))}
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.35fr_0.65fr]">
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-ink">Recent orders</h2>
-            <Link to="/buyer/orders" className="text-sm font-medium text-primary">View all</Link>
+      <section className="grid gap-5 xl:grid-cols-[1.5fr_0.8fr]">
+        <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Recent orders</h2>
+              <p className="mt-1 text-xs text-slate-500">Latest activity across your orders</p>
+            </div>
+            <Link to="/buyer/orders" className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-blue-600 hover:text-blue-800">
+              View all <ArrowRight className="h-4 w-4" aria-hidden />
+            </Link>
           </div>
-          <div className="space-y-3">
-            {orders.slice(0, 4).map((order) => (
-              <div key={order.id} className="rounded-xl border border-line p-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-ink">{order.id}</p>
-                    <p className="text-sm text-muted">{order.productName}</p>
-                  </div>
-                  <span className="rounded-full bg-primary/5 px-2.5 py-1 text-xs font-semibold text-primary">{order.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+          {latestOrders.length ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-[620px] w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="rounded-l-lg px-3 py-3 font-semibold">Order</th>
+                    <th className="px-3 py-3 font-semibold">Product</th>
+                    <th className="px-3 py-3 font-semibold">Quantity</th>
+                    <th className="px-3 py-3 font-semibold">Delivery</th>
+                    <th className="rounded-r-lg px-3 py-3 font-semibold">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {latestOrders.map((order) => (
+                    <tr key={order.id} className="transition hover:bg-slate-50/80">
+                      <td className="px-3 py-3.5">
+                        <Link to={`/buyer/orders/${order.id}`} className="font-semibold text-slate-800 hover:text-blue-700">{order.id}</Link>
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <p className="font-medium text-slate-700">{order.productName}</p>
+                        <p className="mt-0.5 text-xs text-slate-400">{order.shade}</p>
+                      </td>
+                      <td className="px-3 py-3.5 text-slate-600">{order.quantity.toLocaleString()} {order.unit}</td>
+                      <td className="px-3 py-3.5 whitespace-nowrap text-slate-600">
+                        {order.requestedDeliveryDate ? new Date(`${order.requestedDeliveryDate}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                      </td>
+                      <td className="px-3 py-3.5">
+                        <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700">
+                          <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                          {order.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-200 px-5 py-10 text-center">
+              <Package className="mx-auto h-8 w-8 text-slate-300" aria-hidden />
+              <p className="mt-3 text-sm font-semibold text-slate-700">No orders yet</p>
+              <p className="mt-1 text-sm text-slate-500">Your submitted orders will appear here.</p>
+              <Link to="/buyer/orders/new" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-600">
+                Place your first order <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
+            </div>
+          )}
         </div>
 
-        <div className="rounded-2xl border border-line bg-surface p-5 shadow-card">
-          <h2 className="text-lg font-semibold text-ink">Delivery snapshot</h2>
-          <div className="mt-4 space-y-4">
-            {orders.slice(0, 3).map((order) => (
-              <div key={order.id} className="rounded-xl bg-canvas p-3">
-                <p className="text-sm font-semibold text-ink">{order.id}</p>
-                <p className="mt-1 text-xs text-muted">Needed by {order.requestedDeliveryDate}</p>
-                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-accent">{order.status}</p>
-              </div>
-            ))}
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">Delivery schedule</h2>
+              <p className="mt-1 text-xs text-slate-500">Requested delivery dates for active orders</p>
+            </div>
+            <CalendarDays className="h-5 w-5 text-slate-400" aria-hidden />
           </div>
+          {dueOrders.length ? (
+            <div className="space-y-3">
+              {dueOrders.slice(0, 4).map((order, index) => (
+                <Link key={order.id} to={`/buyer/orders/${order.id}`} className="flex items-start gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-blue-200 hover:bg-blue-50/40">
+                  <div className={`flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg ${index === 0 ? 'bg-blue-50 text-blue-700' : 'bg-slate-50 text-slate-600'}`}>
+                    <span className="text-[9px] font-bold uppercase">{new Date(`${order.requestedDeliveryDate}T00:00:00`).toLocaleDateString('en-IN', { month: 'short' })}</span>
+                    <span className="text-sm font-bold leading-4">{new Date(`${order.requestedDeliveryDate}T00:00:00`).getDate()}</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold text-slate-800">{order.id}</p>
+                      <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">{order.productName}</p>
+                    <p className="mt-2 flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                      <Clock3 className="h-3 w-3" aria-hidden /> {order.status}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-xl bg-slate-50 px-4 py-8 text-center">
+              <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-500" aria-hidden />
+              <p className="mt-2 text-sm font-medium text-slate-700">No upcoming deliveries</p>
+              <p className="mt-1 text-xs text-slate-500">Delivery dates will show here when available.</p>
+            </div>
+          )}
+          <Link to="/buyer/tracking" className="mt-4 flex items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+            Track all orders <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
         </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        <Link to="/buyer/tracking" className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600"><Truck className="h-5 w-5" aria-hidden /></div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-slate-800">Track your order</p>
+            <p className="mt-1 text-sm text-slate-500">Follow production and dispatch progress.</p>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-1 group-hover:text-blue-600" aria-hidden />
+        </Link>
+        <Link to="/buyer/inquiries" className="group flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-blue-200 hover:shadow-md">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600"><ClipboardCheck className="h-5 w-5" aria-hidden /></div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-slate-800">Need help with an order?</p>
+            <p className="mt-1 text-sm text-slate-500">{openInquiries.length ? `${openInquiries.length} open ${openInquiries.length === 1 ? 'inquiry' : 'inquiries'} to review.` : 'Start or review a conversation with our team.'}</p>
+          </div>
+          <ArrowRight className="h-4 w-4 shrink-0 text-slate-400 transition group-hover:translate-x-1 group-hover:text-blue-600" aria-hidden />
+        </Link>
       </section>
     </div>
   )

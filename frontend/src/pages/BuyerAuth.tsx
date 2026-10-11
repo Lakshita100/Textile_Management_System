@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Eye, EyeOff, Info, Loader2 } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Info, Loader2 } from 'lucide-react'
 import { buttonClass } from '../components/ui/Button'
 import GoogleSignInButton from '../components/auth/GoogleSignInButton'
+import AuthPageShell from '../components/auth/AuthPageShell'
 import { getCurrentSession } from '../services/orderService'
 import { useAuth } from '../store/AuthProvider'
 import { errorMessage } from '../services/http'
@@ -57,26 +58,11 @@ export function BuyerLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-canvas">
-      <div className="mx-auto flex w-full max-w-6xl items-center justify-center px-4 py-8">
-        <div className="grid w-full max-w-5xl overflow-hidden rounded-3xl border border-line bg-surface shadow-elevated lg:grid-cols-2">
-          <div className="bg-gradient-to-br from-primary to-sky-900 p-8 text-white">
-            <Link to="/" className="inline-flex items-center gap-2 text-sm font-medium text-white/90">
-              <ArrowLeft className="h-4 w-4" /> Back to website
-            </Link>
-            <div className="mt-12">
-              <p className="text-sm uppercase tracking-[0.2em] text-white/70">Buyer portal</p>
-              <h1 className="mt-3 font-display text-4xl font-extrabold">Place orders with confidence.</h1>
-              <p className="mt-4 max-w-md text-sm text-white/80">
-                Track your material requirements, review status changes and continue communication with Everest Textile Mills.
-              </p>
-            </div>
-            <div className="mt-8 rounded-2xl border border-white/20 bg-white/5 p-4 text-sm text-white/80">
-              Buyers sign in with their email. Employees and administrators use the unique ID provided by the administrator on the factory sign-in page.
-            </div>
-          </div>
-
-          <div className="p-6 sm:p-8">
+    <AuthPageShell
+      eyebrow="BUYER PORTAL"
+      heading="Place orders with confidence."
+      description="Track your material requirements, review status changes and stay connected with Everest Textile Mills."
+    >
             <div className="flex items-center justify-between">
               <h2 className="font-display text-2xl font-bold text-ink">Buyer login</h2>
               <Link to="/signup" className="text-sm font-semibold text-primary">Create account</Link>
@@ -140,10 +126,7 @@ export function BuyerLoginPage() {
             </form>
             <div className="my-5 flex items-center gap-3 text-xs text-muted"><span className="h-px flex-1 bg-line" />or buyer sign-in<span className="h-px flex-1 bg-line" /></div>
             <GoogleSignInButton onCredential={handleGoogleCredential} />
-          </div>
-        </div>
-      </div>
-    </div>
+    </AuthPageShell>
   )
 }
 

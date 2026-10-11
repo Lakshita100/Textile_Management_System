@@ -4,13 +4,13 @@ import { DashboardMock } from './dashboard/DashboardMock';
 
 export function DashboardPreview() {
   return (
-    <section id="dashboard" className="scroll-mt-24 bg-surface py-20 lg:py-28">
+    <section id="dashboard" className="scroll-mt-24 bg-white py-16 lg:py-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="reveal">
           <SectionHeading
             eyebrow="Product Preview"
             title="Your Factory. One Clear View."
-            description="Get a real-time overview of inventory, production, machine availability, order progress, and dispatch operations."
+            description="Preview a consolidated view of inventory, production, machine availability, order progress, and dispatch operations."
           />
         </div>
 
@@ -22,14 +22,14 @@ export function DashboardPreview() {
             deadlines. All figures are sample demonstration data.
           </p>
 
-          <div className="mt-12 overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated">
-            <div className="flex items-center gap-3 border-b border-line bg-canvas px-4 py-3">
+          <div className="mt-10 overflow-hidden rounded-2xl border border-line bg-white shadow-elevated">
+            <div className="flex items-center gap-3 border-b border-line bg-surface px-4 py-3">
               <span aria-hidden className="flex gap-1.5">
                 <span className="size-2.5 rounded-full bg-line" />
                 <span className="size-2.5 rounded-full bg-line" />
                 <span className="size-2.5 rounded-full bg-line" />
               </span>
-              <span className="mx-auto flex items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-1 text-[11px] font-medium text-muted">
+              <span className="mx-auto flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-1 text-[11px] font-medium text-muted">
                 <Lock aria-hidden className="size-3" />
                 Textile Manufacturing System — dashboard preview
               </span>
