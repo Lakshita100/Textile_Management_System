@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { WorkerContext } from '../context/WorkerContext';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SmartScannerModal({ visible, onClose }) {
   const { worker, activeShift, punchAttendance } = useContext(WorkerContext);
@@ -48,11 +49,15 @@ export default function SmartScannerModal({ visible, onClose }) {
 
   const handleScanAction = () => {
     setIsProcessing(true);
-    setTimeout(() => {
-      const res = punchAttendance();
-      setIsProcessing(false);
-      setScanResult(res);
-    }, 800);
+    setTimeout(async () => {
+      try {
+        const res = await punchAttendance();
+        setIsProcessing(false);
+        setScanResult(res);
+      } catch (_e) {
+        setIsProcessing(false);
+      }
+    }, 600);
   };
 
   const laserY = laserAnim.interpolate({
@@ -122,16 +127,18 @@ export default function SmartScannerModal({ visible, onClose }) {
               <View
                 style={[
                   styles.resultIconCircle,
-                  scanResult.action === 'IN' ? styles.iconIn : styles.iconOut,
+                  scanResult?.action === 'IN' ? styles.iconIn : styles.iconOut,
                 ]}
               >
-                <Text style={styles.resultIconText}>
-                  {scanResult.action === 'IN' ? '✓' : '🚪'}
-                </Text>
+                <Ionicons
+                  name={scanResult?.action === 'IN' ? 'checkmark' : 'log-out-outline'}
+                  size={32}
+                  color="#FFFFFF"
+                />
               </View>
 
               <Text style={styles.resultTitle}>
-                {scanResult.action === 'IN' ? 'CHECKED IN SUCCESS' : 'CHECKED OUT SUCCESS'}
+                {scanResult?.action === 'IN' ? 'CHECKED IN SUCCESS' : 'CHECKED OUT SUCCESS'}
               </Text>
 
               <View style={styles.detailsCard}>

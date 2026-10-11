@@ -11,13 +11,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { AppContext, STATION_QR_DATA } from '../context/AppContext';
+import { AppContext, STATION_QR_DATA, generateStationQrData } from '../context/AppContext';
 import { COLORS } from '../styles/theme';
 
 export default function AdminHome() {
   const { currentUser, employees, logout, syncBackendAttendance } = useContext(AppContext);
   const { width } = useWindowDimensions();
   const [refreshing, setRefreshing] = useState(false);
+  const [stationQr, setStationQr] = useState(
+    typeof generateStationQrData === 'function' ? generateStationQrData() : STATION_QR_DATA
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -106,7 +109,7 @@ export default function AdminHome() {
 
           <View style={styles.qrContainer}>
             <QRCode
-              value={STATION_QR_DATA}
+              value={stationQr}
               size={qrSize}
               color="#073B63"
               backgroundColor="#FFFFFF"
