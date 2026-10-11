@@ -69,11 +69,11 @@ def predict_probability(
             "efficiency_score": efficiency_score,
             "machine_id": candidate.id,
             "machine_status": candidate.status,
-            "available_date": est.available_date.isoformat(),
-            "start_time": est.start_time.isoformat(),
-            "completion_time": est.completion_time.isoformat(),
-            "setup_hours": est.setup_hours,
-            "process_hours": est.process_hours,
+            "available_date": est.earliest_start_at.date().isoformat(),
+            "start_time": est.earliest_start_at.isoformat(),
+            "completion_time": est.completion_at.isoformat(),
+            "setup_hours": est.setup_minutes / 60.0,
+            "process_hours": est.processing_minutes / 60.0,
             "candidate_rank_index": candidate_rank_index,
         }
 
@@ -90,3 +90,29 @@ def predict_probability(
         return float(probs[0][1])
     except Exception:
         return None
+
+
+def selection_probability(
+    candidate: Machine,
+    *,
+    process: str,
+    quantity_kg: float | None,
+    schedule: ScheduleEstimate,
+) -> float | None:
+    """Compatibility adapter used by machine recommendation ranking.
+
+    ML ranking is advisory only; the rule-based eligibility and score remain
+    authoritative. The old call site passed this compact interface while the
+    model implementation used the expanded feature interface above.
+    """
+    del quantity_kg  # The trained ranker uses estimated duration, not kg directly.
+    estimated_hours = (schedule.setup_minutes + schedule.processing_minutes) / 60.0
+    return predict_probability(
+        job_type=process,
+        target_date=None,
+        estimated_hours=estimated_hours,
+        efficiency_score=50.0,
+        candidate=candidate,
+        est=schedule,
+        candidate_rank_index=0,
+    )

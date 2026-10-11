@@ -10,6 +10,7 @@ Security notes:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+import re
 import secrets
 
 import jwt
@@ -87,20 +88,25 @@ def register_user(db: Session, payload: RegisterIn) -> User:
 
 def authenticate(db: Session, identifier: str, password: str) -> User:
     """Verify credentials. Wrong email and wrong password share one error."""
-    normalized = identifier.strip().lower()
+    raw_identifier = identifier.strip()
+    normalized = raw_identifier.lower()
+    normalized_login_id = raw_identifier.upper()
+    legacy_id = re.fullmatch(r"(EMP|ADM)-(\d+)", normalized_login_id)
+    if legacy_id:
+        normalized_login_id = f"{legacy_id.group(1)}-{int(legacy_id.group(2)):06d}"
     user = db.query(User).filter(
-        (User.email == normalized) | (User.login_id == identifier.strip().upper())
+        (User.email == normalized) | (User.login_id == normalized_login_id)
     ).first()
     if user is None or not verify_password(password, user.password_hash):
         raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect email or password.")
-    if user.role == UserRole.BUYER.value and "@" not in identifier:
+    if user.role == UserRole.BUYER.value and "@" not in raw_identifier:
         raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect email or password.")
     if user.role != UserRole.BUYER.value:
-        if "@" in identifier:
+        if "@" in raw_identifier:
             if user.email != normalized:
                 raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect email or password.")
         else:
-            if not user.login_id or identifier.strip().upper() != user.login_id:
+            if not user.login_id or normalized_login_id != user.login_id:
                 raise AuthError("AUTH_INVALID_CREDENTIALS", "Incorrect employee or administrator ID or password.")
     if not user.is_active:
         raise AuthError("ACCOUNT_DISABLED", "This account has been disabled.")

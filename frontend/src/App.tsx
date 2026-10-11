@@ -47,8 +47,8 @@ export default function App() {
   return (
     <AuthProvider>
       <SessionProvider>
-        <InspectionFormProvider>
-          <BrowserRouter>
+        <BrowserRouter>
+          <InspectionFormProvider>
             <Routes>
               {/* Public marketing / account entry points */}
               <Route path="/" element={<LandingPage />} />
@@ -124,8 +124,8 @@ export default function App() {
 
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
-          </BrowserRouter>
-        </InspectionFormProvider>
+          </InspectionFormProvider>
+        </BrowserRouter>
       </SessionProvider>
     </AuthProvider>
   );

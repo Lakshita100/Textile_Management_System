@@ -8,6 +8,7 @@ import AuthPageShell from '../components/auth/AuthPageShell';
 import { useAuth } from '../store/AuthProvider';
 import { homePathForUser } from '../services/authService';
 import { errorMessage } from '../services/http';
+import { isFullContactName } from '../services/locationService';
 
 interface FormErrors {
   fullName?: string;
@@ -55,7 +56,7 @@ export default function SignUpPage() {
     event.preventDefault();
 
     const nextErrors: FormErrors = {};
-    if (!fullName.trim()) nextErrors.fullName = 'Enter your full name.';
+    if (!isFullContactName(fullName)) nextErrors.fullName = 'Enter your first and last name.';
     if (!email.trim()) {
       nextErrors.email = 'Enter your email address.';
     } else if (!/^\S+@\S+\.\S+$/.test(email.trim())) {

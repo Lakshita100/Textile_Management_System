@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { productionApi, machinesApi, apiErrorMessage } from '../services/api';
 import { getInspectionCounts } from '../services/qualityService';
+import { useInspectionForm } from '../store/inspectionFormContext';
 import type { Job, MachineListItem, Page } from '../types';
 import type { InspectionCount } from '../types/quality';
 import { EmptyState, ErrorAlert, Loading, PageHeader, ProgressBar, StatusBadge, SuccessAlert } from '../components/ui';
@@ -10,10 +11,13 @@ const FILTERS = ['', 'PLANNED', 'IN_PROGRESS', 'PAUSED', 'COMPLETED', 'CANCELLED
 const INSPECTABLE_STATUSES = ['IN_PROGRESS', 'PAUSED', 'COMPLETED'];
 
 export default function JobsPage() {
+  const { openForm } = useInspectionForm();
   const [searchParams] = useSearchParams();
   const focusJob = Number(searchParams.get('job')) || null;
   const [data, setData] = useState<Page<Job> | null>(null);
   const [machines, setMachines] = useState<MachineListItem[]>([]);
+  const [machinesLoading, setMachinesLoading] = useState(false);
+  const [machinesError, setMachinesError] = useState('');
   const [quality, setQuality] = useState<Record<number, InspectionCount>>({});
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -28,13 +32,11 @@ export default function JobsPage() {
     setError('');
     Promise.all([
       productionApi.jobs({ status: status || undefined, page_size: 50 }),
-      machinesApi.list({ page_size: 100 }),
-      getInspectionCounts().catch(() => ({}) as Record<number, InspectionCount>),
+      getInspectionCounts().catch(() => [] as InspectionCount[]),
     ])
-      .then(([j, m, q]) => {
+      .then(([j, inspections]) => {
         setData(j);
-        setMachines(m.items);
-        setQuality(q);
+        setQuality(Object.fromEntries(inspections.map((inspection) => [inspection.jobId, inspection])));
       })
       .catch((e) => setError(apiErrorMessage(e)))
       .finally(() => setLoading(false));
@@ -42,8 +44,34 @@ export default function JobsPage() {
 
   useEffect(() => load(), [load]);
 
+  useEffect(() => {
+    if (!showForm || machines.length > 0) return;
+    setMachinesLoading(true);
+    setMachinesError('');
+    machinesApi.list({ page_size: 100 })
+      .then((result) => setMachines(result.items))
+      .catch((e) => setMachinesError(apiErrorMessage(e)))
+      .finally(() => setMachinesLoading(false));
+  }, [showForm, machines.length]);
+
+  function retryLoad() {
+    setData(null);
+    load();
+  }
+
   async function act(job: Job, action: 'start' | 'pause' | 'resume' | 'complete' | 'cancel') {
     try {
+      if (action === 'complete') {
+        const entered = qty[job.id]?.trim();
+        const actualQuantity = entered ? Number(entered) : job.actual_quantity;
+        if (!Number.isFinite(actualQuantity) || actualQuantity <= 0) {
+          setError(`Enter the actual output for job #${job.id} before completing it.`);
+          return;
+        }
+        if (actualQuantity !== job.actual_quantity) {
+          await productionApi.progress(job.id, actualQuantity);
+        }
+      }
       await productionApi.act(job.id, action);
       setNotice(`Job #${job.id} → ${action}`);
       load();
@@ -90,12 +118,12 @@ export default function JobsPage() {
         </button>
       </PageHeader>
       {notice && <div className="mb-4"><SuccessAlert message={notice} /></div>}
-      {error && <div className="mb-4"><ErrorAlert message={error} /></div>}
+      {error && data && <div className="mb-4"><ErrorAlert message={error} /></div>}
 
       {showForm && (
         <div className="card p-4 mb-4 grid md:grid-cols-5 gap-3 text-sm">
           <select className="border rounded px-2 py-2" style={{ borderColor: 'var(--color-border)' }} value={form.machine_id} onChange={(e) => setForm({ ...form, machine_id: e.target.value })} aria-label="Machine">
-            <option value="">Machine…</option>
+            <option value="">{machinesLoading ? 'Loading machines…' : 'Select machine'}</option>
             {machines.map((m) => <option key={m.id} value={m.id}>{m.code} ({m.status})</option>)}
           </select>
           <input className="border rounded px-2 py-2" style={{ borderColor: 'var(--color-border)' }} placeholder="Order ref" value={form.order_ref} onChange={(e) => setForm({ ...form, order_ref: e.target.value })} />
@@ -105,6 +133,7 @@ export default function JobsPage() {
             <input className="border rounded px-2 py-2 w-24" style={{ borderColor: 'var(--color-border)' }} placeholder="Qty" value={form.planned_quantity} onChange={(e) => setForm({ ...form, planned_quantity: e.target.value })} />
             <button className="btn-accent text-sm px-3" onClick={createJob}>Create</button>
           </div>
+          {machinesError && <p className="text-xs col-span-full" role="alert" style={{ color: 'var(--color-heading)' }}>{machinesError}</p>}
         </div>
       )}
 
@@ -124,6 +153,11 @@ export default function JobsPage() {
 
       {loading ? (
         <Loading />
+      ) : error && !data ? (
+        <div className="card p-5 flex flex-col items-start gap-3">
+          <ErrorAlert message={error} />
+          <button className="btn-secondary text-sm" onClick={retryLoad}>Retry</button>
+        </div>
       ) : !data || data.items.length === 0 ? (
         <EmptyState title="No jobs" hint="Create a job or approve a machine recommendation." />
       ) : (
@@ -141,6 +175,9 @@ export default function JobsPage() {
               {data.items.map((j) => {
                 const inspected = quality[j.id]?.count ?? 0;
                 const canInspect = INSPECTABLE_STATUSES.includes(j.status) && j.actual_quantity > 0;
+                const enteredQuantity = qty[j.id]?.trim();
+                const completionQuantity = enteredQuantity ? Number(enteredQuantity) : j.actual_quantity;
+                const canComplete = Number.isFinite(completionQuantity) && completionQuantity > 0;
                 return (
                 <tr key={j.id} className={`border-t ${focusJob === j.id ? 'bg-panel' : ''}`} style={{ borderColor: 'var(--color-border)' }}>
                   <td className="p-3">{j.id}</td>
@@ -154,7 +191,7 @@ export default function JobsPage() {
                         {inspected} inspection{inspected === 1 ? '' : 's'}
                       </Link>
                     ) : canInspect ? (
-                      <Link to={`/quality/inspections?job=${j.id}`} className="btn-secondary text-xs px-2 py-1">Inspect</Link>
+                      <button type="button" onClick={() => openForm(String(j.machine_id))} className="btn-secondary text-xs px-2 py-1">Inspect</button>
                     ) : (
                       <span className="muted">-</span>
                     )}
@@ -188,7 +225,15 @@ export default function JobsPage() {
                     {j.status === 'PLANNED' && <button className="btn-primary text-xs px-2 py-1" onClick={() => act(j, 'start')}>Start</button>}
                     {j.status === 'IN_PROGRESS' && <button className="btn-secondary text-xs px-2 py-1" onClick={() => act(j, 'pause')}>Pause</button>}
                     {j.status === 'PAUSED' && <button className="btn-primary text-xs px-2 py-1" onClick={() => act(j, 'resume')}>Resume</button>}
-                    {['IN_PROGRESS', 'PAUSED'].includes(j.status) && <button className="btn-accent text-xs px-2 py-1" onClick={() => act(j, 'complete')}>Complete</button>}
+                    {['IN_PROGRESS', 'PAUSED'].includes(j.status) && (
+                      <button
+                        className="btn-accent text-xs px-2 py-1 disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => act(j, 'complete')}
+                        disabled={!canComplete}
+                        title={canComplete ? 'Save output and complete this job' : 'Enter actual output before completing'}
+                      >Complete</button>
+                    )}
+                    {['IN_PROGRESS', 'PAUSED'].includes(j.status) && !canComplete && <span className="self-center text-xs muted">Enter actual output to complete</span>}
                     {['PLANNED', 'IN_PROGRESS', 'PAUSED'].includes(j.status) && <button className="btn-secondary text-xs px-2 py-1" onClick={() => act(j, 'cancel')}>Cancel</button>}
                   </td>
                 </tr>

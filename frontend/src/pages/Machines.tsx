@@ -5,6 +5,7 @@ import type { MachineListItem, Page } from '../types';
 import { EmptyState, ErrorAlert, Loading, PageHeader, ProgressBar, StatusBadge } from '../components/ui';
 
 const STATUSES = ['', 'RUNNING', 'IDLE', 'MAINTENANCE'];
+const CHANGEABLE_STATUSES = ['IDLE', 'MAINTENANCE'];
 
 export default function MachinesPage() {
   const [data, setData] = useState<Page<MachineListItem> | null>(null);
@@ -15,8 +16,8 @@ export default function MachinesPage() {
   const [loading, setLoading] = useState(true);
   const [statusMsg, setStatusMsg] = useState('');
 
-  const load = useCallback(() => {
-    setLoading(true);
+  const load = useCallback((showLoader = true) => {
+    if (showLoader) setLoading(true);
     setError('');
     machinesApi
       .list({ search: search || undefined, status: status || undefined, process: process || undefined, page_size: 50 })
@@ -26,8 +27,12 @@ export default function MachinesPage() {
   }, [search, status, process]);
 
   useEffect(() => {
-    const t = setTimeout(load, 250);
-    return () => clearTimeout(t);
+    const t = setTimeout(() => load(true), 250);
+    const refresh = window.setInterval(() => load(false), 5000);
+    return () => {
+      clearTimeout(t);
+      clearInterval(refresh);
+    };
   }, [load]);
 
   async function changeStatus(m: MachineListItem, newStatus: string) {
@@ -84,7 +89,7 @@ export default function MachinesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="table-header text-left">
-                <th className="p-3">Code</th><th className="p-3">Name</th><th className="p-3">Type</th>
+        <th className="p-3">Machine #</th><th className="p-3">Code</th><th className="p-3">Name</th><th className="p-3">Type</th>
                 <th className="p-3">Processes</th><th className="p-3">Capacity</th><th className="p-3">Status</th>
                 <th className="p-3">Assignment</th><th className="p-3">Efficiency</th><th className="p-3">Actions</th>
               </tr>
@@ -92,6 +97,7 @@ export default function MachinesPage() {
             <tbody>
               {data.items.map((m) => (
                 <tr key={m.id} className="border-t" style={{ borderColor: 'var(--color-border)' }}>
+                  <td className="p-3 font-mono text-xs">#{m.id}</td>
                   <td className="p-3 font-medium"><Link to={`/machines/${m.id}`} style={{ color: 'var(--color-link)' }}>{m.code}</Link></td>
                   <td className="p-3">{m.name}</td>
                   <td className="p-3">{m.machine_type}</td>
@@ -118,14 +124,14 @@ export default function MachinesPage() {
                       aria-label={`Change status for ${m.code}`}
                     >
                       <option value="">Set status…</option>
-                      {STATUSES.filter((s) => s && s !== m.status).map((s) => <option key={s} value={s}>{s}</option>)}
+                      {CHANGEABLE_STATUSES.filter((s) => s !== m.status).map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="p-3 text-xs muted">Showing {data.items.length} of {data.total} machines</p>
+          <p className="p-3 text-xs muted">Showing {data.items.length} of {data.total} machines · live status refreshes every 5 seconds</p>
         </div>
       )}
     </div>

@@ -50,7 +50,7 @@ export const machinesApi = {
 
 export const productionApi = {
   dashboard: () => http.get<Dashboard>('/production/dashboard'),
-  jobs: (params: { machine_id?: number; status?: string; page?: number; page_size?: number }) =>
+  jobs: (params: { machine_id?: number; status?: string; order_ref?: string; page?: number; page_size?: number }) =>
     http.get<Page<Job>>(`/production/jobs${buildQueryString(params)}`),
   job: (id: number) => http.get<JobDetail>(`/production/jobs/${id}`),
   createJob: (body: Record<string, unknown>) => http.post<Job>('/production/jobs', body),

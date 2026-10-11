@@ -1,4 +1,4 @@
-export type PackStatus = 'Packed' | 'In warehouse' | 'Dispatched'
+export type PackStatus = 'Pending packing' | 'Packed' | 'In warehouse' | 'Dispatched'
 export type PackType = 'Roll' | 'Bale' | 'Box'
 
 export interface PackedLot {
@@ -14,7 +14,6 @@ export interface PackedLot {
   packedAt: string
   packedBy: string
   status: PackStatus
-  fromInspection?: boolean
 }
 
 export interface PackingStats {

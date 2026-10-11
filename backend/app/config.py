@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 
 class Settings(BaseSettings):
@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     )
 
     # Database
-    DATABASE_URL: str = "sqlite:///./textile_dev.db"
+    DATABASE_URL: str
 
     # JWT (replace with a unique secret outside development)
     SECRET_KEY: str = "change-me-in-production"
@@ -40,7 +40,10 @@ class Settings(BaseSettings):
     # Application
     APP_NAME: str = "Textile Manufacturing Intelligence System"
     API_PREFIX: str = "/api/v1"
-    DEBUG: bool = True
+    # DEBUG is commonly set to strings like "release" by hosting/tooling
+    # environments. Keep this application's flag namespaced to avoid parsing
+    # unrelated global environment values as booleans.
+    DEBUG: bool = Field(default=True, validation_alias="APP_DEBUG")
     ECHO_SQL: bool = False
 
     # CORS
