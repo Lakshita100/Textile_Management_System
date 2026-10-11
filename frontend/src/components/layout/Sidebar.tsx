@@ -1,7 +1,8 @@
-import { X } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { NAV_ITEMS } from './navigation';
 import { useAuth } from '../../store/AuthProvider';
+import { useState, useEffect } from 'react';
 
 interface SidebarProps {
   open: boolean;
@@ -10,6 +11,28 @@ interface SidebarProps {
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const { hasPermission } = useAuth();
+  const location = useLocation();
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    'Production Management': true,
+  });
+
+  useEffect(() => {
+    NAV_ITEMS.forEach((item) => {
+      if (item.children) {
+        const hasChildActive = item.children.some(
+          (child) => child.path && location.pathname.startsWith(child.path)
+        );
+        if (hasChildActive) {
+          setExpandedGroups((prev) => ({ ...prev, [item.label]: true }));
+        }
+      }
+    });
+  }, [location.pathname]);
+
+  const toggleGroup = (label: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
   return (
     <>
       {open ? (
@@ -53,38 +76,104 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
             Modules
           </p>
           <ul className="space-y-1">
-            {NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission)).map((item) => (
-              <li key={item.path}>
-                <NavLink
-                  to={item.path}
-                  end={item.exact}
-                  onClick={onClose}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-[var(--radius-button)] px-3 py-2.5 text-sm font-medium transition-colors ${
-                      isActive
-                        ? 'bg-[var(--color-primary-hover)] text-[var(--color-background)]'
-                        : 'text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
-                    }`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon
-                        size={18}
-                        aria-hidden
-                        className={
-                          isActive
-                            ? 'shrink-0 text-[var(--color-background)]'
-                            : 'shrink-0 text-[var(--color-primary)]'
-                        }
-                      />
-                      <span className="truncate">{item.label}</span>
-                      {isActive ? <span className="sr-only">(current page)</span> : null}
-                    </>
-                  )}
-                </NavLink>
-              </li>
-            ))}
+            {NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission)).map((item) => {
+              if (item.children && item.children.length > 0) {
+                const isExpanded = !!expandedGroups[item.label];
+                const allowedChildren = item.children.filter(
+                  (child) => !child.permission || hasPermission(child.permission)
+                );
+                if (allowedChildren.length === 0) return null;
+
+                return (
+                  <li key={item.label} className="space-y-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(item.label)}
+                      className="flex w-full items-center justify-between gap-3 rounded-[var(--radius-button)] px-3 py-2.5 text-sm font-semibold text-[var(--color-heading)] hover:bg-[var(--color-surface-hover)]"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <item.icon size={18} aria-hidden className="shrink-0 text-[var(--color-primary)]" />
+                        <span className="truncate">{item.label}</span>
+                      </div>
+                      {isExpanded ? (
+                        <ChevronDown size={16} className="shrink-0 text-[var(--color-text-muted)]" />
+                      ) : (
+                        <ChevronRight size={16} className="shrink-0 text-[var(--color-text-muted)]" />
+                      )}
+                    </button>
+
+                    {isExpanded && (
+                      <ul className="ml-4 border-l border-[var(--color-border)] pl-2 space-y-1">
+                        {allowedChildren.map((child) => (
+                          <li key={child.path}>
+                            <NavLink
+                              to={child.path!}
+                              end={child.exact}
+                              onClick={onClose}
+                              className={({ isActive }) =>
+                                `flex items-center gap-2.5 rounded-[var(--radius-button)] px-3 py-2 text-xs font-medium transition-colors ${
+                                  isActive
+                                    ? 'bg-[var(--color-primary-hover)] text-[var(--color-background)] font-semibold'
+                                    : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-heading)]'
+                                }`
+                              }
+                            >
+                              {({ isActive }) => (
+                                <>
+                                  <child.icon
+                                    size={16}
+                                    aria-hidden
+                                    className={
+                                      isActive
+                                        ? 'shrink-0 text-[var(--color-background)]'
+                                        : 'shrink-0 text-[var(--color-primary)]'
+                                    }
+                                  />
+                                  <span className="truncate">{child.label}</span>
+                                </>
+                              )}
+                            </NavLink>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              }
+
+              return (
+                <li key={item.path}>
+                  <NavLink
+                    to={item.path!}
+                    end={item.exact}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-[var(--radius-button)] px-3 py-2.5 text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-[var(--color-primary-hover)] text-[var(--color-background)]'
+                          : 'text-[var(--color-text)] hover:bg-[var(--color-surface-hover)]'
+                      }`
+                    }
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <item.icon
+                          size={18}
+                          aria-hidden
+                          className={
+                            isActive
+                              ? 'shrink-0 text-[var(--color-background)]'
+                              : 'shrink-0 text-[var(--color-primary)]'
+                          }
+                        />
+                        <span className="truncate">{item.label}</span>
+                        {isActive ? <span className="sr-only">(current page)</span> : null}
+                      </>
+                    )}
+                  </NavLink>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 

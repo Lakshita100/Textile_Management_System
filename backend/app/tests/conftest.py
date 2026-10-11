@@ -87,8 +87,24 @@ def clean_tables(db):
 
 
 @pytest.fixture()
-def client():
+def client(db):
     with TestClient(app) as test_client:
+        from app.models.auth import User
+        from app.services.auth import hash_password, create_access_token
+        user = db.query(User).filter(User.email == "testadmin@example.com").first()
+        if not user:
+            user = User(
+                email="testadmin@example.com",
+                password_hash=hash_password("password123"),
+                full_name="Admin",
+                role="admin",
+                is_active=True,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        token = create_access_token(user)
+        test_client.headers["Authorization"] = f"Bearer {token}"
         yield test_client
 
 

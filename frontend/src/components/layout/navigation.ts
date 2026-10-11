@@ -20,11 +20,13 @@ export interface NavItem {
   crumb: string;
   /** Short module name shown in the topbar module chip. */
   module: string;
-  path: string;
+  path?: string;
   icon: LucideIcon;
   /** Match the path exactly (used by the dashboard home route). */
   exact?: boolean;
   permission?: string;
+  /** Sub-topics nested under a parent module. */
+  children?: NavItem[];
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -38,36 +40,45 @@ export const NAV_ITEMS: NavItem[] = [
     permission: 'production',
   },
   {
-    label: 'Yarn Inventory',
-    crumb: 'Inventory',
-    module: 'Inventory',
-    path: '/inventory',
+    label: 'Production Management',
+    crumb: 'Production Management',
+    module: 'Production',
     icon: Boxes,
     permission: 'materials',
-  },
-  {
-    label: 'Low-Stock Alerts',
-    crumb: 'Low-Stock Alerts',
-    module: 'Alerts',
-    path: '/alerts',
-    icon: TriangleAlert,
-    permission: 'materials',
-  },
-  {
-    label: 'Stock Movements',
-    crumb: 'Stock Movements',
-    module: 'Movements',
-    path: '/movements',
-    icon: ArrowLeftRight,
-    permission: 'materials',
-  },
-  {
-    label: 'Suppliers',
-    crumb: 'Suppliers',
-    module: 'Suppliers',
-    path: '/suppliers',
-    icon: Truck,
-    permission: 'materials',
+    children: [
+      {
+        label: 'Yarn Inventory',
+        crumb: 'Inventory',
+        module: 'Inventory',
+        path: '/inventory',
+        icon: Boxes,
+        permission: 'materials',
+      },
+      {
+        label: 'Low-Stock Alerts',
+        crumb: 'Low-Stock Alerts',
+        module: 'Alerts',
+        path: '/alerts',
+        icon: TriangleAlert,
+        permission: 'materials',
+      },
+      {
+        label: 'Stock Movements',
+        crumb: 'Stock Movements',
+        module: 'Movements',
+        path: '/movements',
+        icon: ArrowLeftRight,
+        permission: 'materials',
+      },
+      {
+        label: 'Suppliers',
+        crumb: 'Suppliers',
+        module: 'Suppliers',
+        path: '/suppliers',
+        icon: Truck,
+        permission: 'materials',
+      },
+    ],
   },
   {
     label: 'Purchase Requests',
@@ -136,5 +147,16 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 export function findNavItem(pathname: string): NavItem | undefined {
-  return NAV_ITEMS.find((item) => (item.exact ? pathname === item.path : pathname.startsWith(item.path)));
+  for (const item of NAV_ITEMS) {
+    if (item.children) {
+      const childMatch = item.children.find(
+        (child) => child.path && (child.exact ? pathname === child.path : pathname.startsWith(child.path))
+      );
+      if (childMatch) return childMatch;
+    }
+    if (item.path && (item.exact ? pathname === item.path : pathname.startsWith(item.path))) {
+      return item;
+    }
+  }
+  return undefined;
 }

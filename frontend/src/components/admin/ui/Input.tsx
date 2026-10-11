@@ -36,10 +36,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               'w-full rounded-lg border bg-white px-3 text-sm text-text-primary placeholder:text-text-muted transition-colors',
               'focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary',
               'disabled:bg-gray-50 disabled:text-text-muted disabled:cursor-not-allowed',
-              leftIcon && 'pl-10',
-              rightIcon && 'pr-10',
-              error && 'border-error focus:border-error focus:ring-error/20',
-              !error && 'border-border hover:border-border-strong',
+              leftIcon ? 'pl-10' : undefined,
+              rightIcon ? 'pr-10' : undefined,
+              error ? 'border-error focus:border-error focus:ring-error/20' : undefined,
+              !error ? 'border-border hover:border-border-strong' : undefined,
               className
             )}
             aria-invalid={error ? 'true' : 'false'}

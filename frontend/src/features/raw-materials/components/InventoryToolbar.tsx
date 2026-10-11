@@ -21,7 +21,7 @@ interface InventoryToolbarProps {
 }
 
 const SELECT_CLASS =
-  'h-11 w-full appearance-none rounded-[var(--radius-input)] border border-[var(--color-border)] bg-[var(--color-input-background)] py-2 pl-3 pr-9 text-sm text-[var(--color-text)]';
+  'h-10 w-full appearance-none rounded-[var(--radius-input)] border border-[var(--color-border)] bg-[var(--color-input-background)] py-2 pl-3 pr-7 text-xs sm:text-sm text-[var(--color-text)] truncate cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-light)]';
 
 function SelectFilter({
   id,
@@ -39,7 +39,7 @@ function SelectFilter({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="relative md:w-48">
+    <div className="relative w-full xl:w-auto xl:flex-1 xl:min-w-[115px] xl:max-w-[170px]">
       <label htmlFor={id} className="sr-only">
         {label}
       </label>
@@ -52,9 +52,9 @@ function SelectFilter({
         ))}
       </select>
       <ChevronDown
-        size={16}
+        size={14}
         aria-hidden
-        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
+        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
       />
     </div>
   );
@@ -83,13 +83,13 @@ export default function InventoryToolbar({
     current !== '' && !values.includes(current) ? [current, ...values] : [...values];
 
   return (
-    <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
-      <div className="relative min-w-56 flex-1">
+    <div className="flex flex-col gap-2.5 xl:flex-row xl:items-center xl:flex-nowrap w-full">
+      <div className="relative flex-1 min-w-[180px] xl:max-w-[260px] 2xl:max-w-[300px]">
         <label htmlFor="yarn-search" className="sr-only">
           Search yarn stock
         </label>
         <Search
-          size={16}
+          size={15}
           aria-hidden
           className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]"
         />
@@ -98,12 +98,12 @@ export default function InventoryToolbar({
           type="search"
           value={query}
           onChange={(event) => onQueryChange(event.target.value)}
-          placeholder="Search by yarn ID, yarn name or product code"
-          className="h-11 w-full rounded-[var(--radius-input)] border border-[var(--color-border)] bg-[var(--color-input-background)] py-2 pl-9 pr-3 text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)]"
+          placeholder="Search by yarn ID, name or code"
+          className="h-10 w-full rounded-[var(--radius-input)] border border-[var(--color-border)] bg-[var(--color-input-background)] py-2 pl-9 pr-3 text-xs sm:text-sm text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary-light)]"
         />
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:flex xl:flex-1 xl:items-center xl:flex-nowrap gap-2.5">
         <SelectFilter
           id="yarn-category-filter"
           label="Filter by category"
@@ -146,8 +146,12 @@ export default function InventoryToolbar({
         />
 
         {hasActiveFilters ? (
-          <button type="button" className="btn-secondary h-11" onClick={onClearFilters}>
-            <X size={16} aria-hidden />
+          <button
+            type="button"
+            className="btn-secondary h-10 px-3 py-1.5 whitespace-nowrap shrink-0 text-xs sm:text-sm flex items-center gap-1.5 xl:w-auto col-span-2 sm:col-span-1"
+            onClick={onClearFilters}
+          >
+            <X size={14} aria-hidden />
             Clear filters
           </button>
         ) : null}

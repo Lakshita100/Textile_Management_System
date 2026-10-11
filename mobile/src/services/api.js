@@ -62,6 +62,33 @@ async function fetchApi(url, options = {}, timeoutMs = 5000) {
   }
 }
 
+// Generic helper with timeout & silent fallback handling (for catalog & attendance syncing)
+async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(options.headers || {}),
+      },
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return null;
+    }
+    return await response.json().catch(() => null);
+  } catch (error) {
+    clearTimeout(timeoutId);
+    return null;
+  }
+}
+
 // -------------------------------------------------------------
 // AUTHENTICATION APIs (Matching Web Frontend)
 // -------------------------------------------------------------

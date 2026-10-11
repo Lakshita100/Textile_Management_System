@@ -6,6 +6,7 @@ import {
   Bell,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   FileText,
   LogOut,
@@ -34,9 +35,16 @@ import {
   updateInquiryStatus,
 } from '../services/orderService'
 
+interface AdminNavItem {
+  to?: string;
+  label: string;
+  end?: boolean;
+  children?: { to: string; label: string }[];
+}
+
 const adminNavSections: ReadonlyArray<{
   title: string
-  items: ReadonlyArray<{ to: string; label: string; end: boolean }>
+  items: ReadonlyArray<AdminNavItem>
 }> = [
   {
     title: 'OVERVIEW',
@@ -54,10 +62,16 @@ const adminNavSections: ReadonlyArray<{
   {
     title: 'INVENTORY & OPERATIONS',
     items: [
-      { to: '/admin/materials', label: 'Raw Materials & Inventory', end: false },
-      { to: '/admin/suppliers', label: 'Suppliers & Purchases', end: false },
-      { to: '/admin/movements', label: 'Stock Movements', end: false },
-      { to: '/admin/alerts', label: 'Low-Stock Alerts', end: false },
+      {
+        label: 'Production Management',
+        to: '/admin/production',
+        children: [
+          { to: '/admin/inventory', label: 'Yarn Inventory' },
+          { to: '/admin/alerts', label: 'Low-Stock Alerts' },
+          { to: '/admin/movements', label: 'Stock Movements' },
+          { to: '/admin/suppliers', label: 'Suppliers' },
+        ],
+      },
       { to: '/admin/machines', label: 'Machines', end: false },
       { to: '/admin/jobs', label: 'Production Jobs', end: false },
       { to: '/admin/recommend', label: 'Production Recommendations', end: false },
@@ -102,13 +116,24 @@ export function AdminPanelLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const session = getCurrentSession()
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({
+    'Production Management': true,
+  })
 
   const { signOut } = useAuth()
   const handleLogout = () => {
     void signOut().finally(() => navigate('/login'))
   }
 
-  const activeLabel = adminNavSections.flatMap((group) => group.items).find((item) => (item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)))?.label ?? 'Dashboard'
+  const toggleGroup = (label: string) => {
+    setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }))
+  }
+
+  const activeLabel =
+    adminNavSections
+      .flatMap((group) => group.items.flatMap((item) => (item.children ? [item, ...item.children] : [item])))
+      .find((item) => item.to && ('end' in item && item.end ? location.pathname === item.to : location.pathname.startsWith(item.to)))
+      ?.label ?? 'Dashboard'
 
   useEffect(() => {
     if (location.pathname === '/admin/manual-order') {
@@ -137,27 +162,81 @@ export function AdminPanelLayout() {
               <div key={section.title}>
                 <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">{section.title}</p>
                 <div className="space-y-1">
-                  {section.items.map(({ to, label, end }) => (
-                    <NavLink
-                      key={`${section.title}-${to}`}
-                      to={to}
-                      end={end}
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
-                          isActive
-                            ? 'bg-[#0f2d5b] text-white shadow-inner'
-                            : 'text-slate-200 hover:bg-[#102749] hover:text-white'
-                        }`
-                      }
-                    >
-                      {({ isActive }) => (
-                        <>
-                          <ArrowRight className={`h-4 w-4 ${isActive ? 'text-white' : 'text-sky-300'}`} />
-                          <span>{label}</span>
-                        </>
-                      )}
-                    </NavLink>
-                  ))}
+                  {section.items.map((item) => {
+                    if (item.children && item.children.length > 0) {
+                      const isExpanded = !!expandedGroups[item.label]
+                      const isChildActive = item.children.some((c) => location.pathname.startsWith(c.to))
+                      const isParentActive = item.to ? location.pathname === item.to || isChildActive : isChildActive
+
+                      return (
+                        <div key={item.label} className="space-y-1">
+                          <div
+                            className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium transition-colors ${
+                              isParentActive ? 'bg-[#0f2d5b] text-white shadow-inner' : 'text-slate-200 hover:bg-[#102749] hover:text-white'
+                            }`}
+                          >
+                            <NavLink
+                              to={item.to!}
+                              className="flex flex-1 items-center gap-2.5 font-semibold text-slate-100"
+                            >
+                              <ArrowRight className={`h-4 w-4 ${isParentActive ? 'text-white' : 'text-sky-300'}`} />
+                              <span>{item.label}</span>
+                            </NavLink>
+                            <button
+                              type="button"
+                              onClick={() => toggleGroup(item.label)}
+                              className="p-1 text-slate-300 hover:text-white"
+                              aria-label="Toggle sub-modules"
+                            >
+                              {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            </button>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="ml-4 space-y-1 border-l border-slate-600 pl-2">
+                              {item.children.map((child) => (
+                                <NavLink
+                                  key={child.to}
+                                  to={child.to}
+                                  className={({ isActive }) =>
+                                    `block rounded-lg px-3 py-1.5 text-xs font-medium transition ${
+                                      isActive
+                                        ? 'bg-sky-600 text-white font-semibold shadow-sm'
+                                        : 'text-slate-300 hover:bg-[#102749] hover:text-white'
+                                    }`
+                                  }
+                                >
+                                  {child.label}
+                                </NavLink>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    return (
+                      <NavLink
+                        key={`${section.title}-${item.to}`}
+                        to={item.to!}
+                        end={item.end}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'bg-[#0f2d5b] text-white shadow-inner'
+                              : 'text-slate-200 hover:bg-[#102749] hover:text-white'
+                          }`
+                        }
+                      >
+                        {({ isActive }) => (
+                          <>
+                            <ArrowRight className={`h-4 w-4 ${isActive ? 'text-white' : 'text-sky-300'}`} />
+                            <span>{item.label}</span>
+                          </>
+                        )}
+                      </NavLink>
+                    )
+                  })}
                 </div>
               </div>
             ))}

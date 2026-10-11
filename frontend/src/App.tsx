@@ -82,6 +82,7 @@ export default function App() {
 <Route path="employees" element={<AdminEmployeesPage />} />
                 <Route path="attendance" element={<AttendancePage />} />
                 <Route path="materials" element={<RawMaterialsPage defaultSection="inventory" hideTabs />} />
+                <Route path="inventory" element={<RawMaterialsPage defaultSection="inventory" hideTabs />} />
                 <Route path="alerts" element={<RawMaterialsPage defaultSection="alerts" hideTabs />} />
                 <Route path="movements" element={<RawMaterialsPage defaultSection="movements" hideTabs />} />
                 <Route path="suppliers" element={<RawMaterialsPage defaultSection="suppliers" hideTabs />} />

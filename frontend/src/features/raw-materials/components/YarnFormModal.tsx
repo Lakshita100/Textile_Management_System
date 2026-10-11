@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { Ban, Minus, Plus, Save } from 'lucide-react';
 import Modal from './Modal';
 import { YARN_THUMBNAIL_OPTIONS } from '../images';
@@ -22,12 +22,15 @@ import {
 } from '../movementLogic';
 import { INVENTORY_STAGES, YARN_CATEGORIES, type YarnItem, type YarnRow } from '../types';
 
+import type { Supplier } from '../types';
+
 interface YarnFormModalProps {
   open: boolean;
   mode: 'add' | 'edit';
   /** Target record when `mode` is `edit`. */
   item?: YarnItem;
   items: YarnItem[];
+  suppliers?: Supplier[];
   onClose: () => void;
   onSubmit: (row: YarnRow) => Promise<ActionResult>;
   /** Add/Subtract Stock (edit mode only) — saved through the movements API. */
@@ -46,6 +49,8 @@ interface FieldDef {
   wide?: boolean;
 }
 
+const UNIT_OPTIONS = ['kg', 'lbs', 'meters', 'tons', 'bales', 'rolls'] as const;
+
 const FIELDS: FieldDef[] = [
   { name: 'yarnId', kind: 'text', placeholder: 'YRN-00001' },
   { name: 'productCode', kind: 'text', placeholder: 'RPY-100' },
@@ -57,7 +62,7 @@ const FIELDS: FieldDef[] = [
   { name: 'denierSpecification', kind: 'text', placeholder: '150D/48F' },
   { name: 'currentStock', kind: 'number', min: '0', step: 'any', placeholder: '0' },
   { name: 'minimumStockLevel', kind: 'number', min: '0', step: 'any', placeholder: '0' },
-  { name: 'unit', kind: 'text', placeholder: 'kg' },
+  { name: 'unit', kind: 'select', options: UNIT_OPTIONS },
   { name: 'unitCost', kind: 'number', min: '0', step: '0.01', placeholder: '0.00' },
   { name: 'supplierSource', kind: 'text', placeholder: 'Shakti Polymers' },
   { name: 'storageLocation', kind: 'text', placeholder: 'Warehouse A' },
@@ -339,6 +344,7 @@ export default function YarnFormModal({
   mode,
   item,
   items,
+  suppliers = [],
   onClose,
   onSubmit,
   onAdjustStock,
@@ -357,6 +363,11 @@ export default function YarnFormModal({
 
   const editing = mode === 'edit' && item !== undefined;
   const targetId = editing ? item?.yarnId : undefined;
+
+  const supplierNames = useMemo(
+    () => Array.from(new Set(suppliers.map((s) => s.companyName).filter(Boolean))),
+    [suppliers],
+  );
 
   useEffect(() => {
     if (!open) {
@@ -459,17 +470,23 @@ export default function YarnFormModal({
         ) : null}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {FIELDS.map((field) => (
-            <Field
-              key={field.name}
-              field={field}
-              baseId={baseId}
-              value={field.name === 'currentStock' && editing ? String(serverStock) : values[field.name]}
-              error={errors[field.name]}
-              disabled={field.name === 'currentStock' && editing}
-              onChange={handleChange(field.name)}
-            />
-          ))}
+          {FIELDS.map((field) => {
+            const dynamicField =
+              field.name === 'supplierSource' && supplierNames.length > 0
+                ? { ...field, kind: 'select' as const, options: supplierNames }
+                : field;
+            return (
+              <Field
+                key={field.name}
+                field={dynamicField}
+                baseId={baseId}
+                value={field.name === 'currentStock' && editing ? String(serverStock) : values[field.name]}
+                error={errors[field.name]}
+                disabled={field.name === 'currentStock' && editing}
+                onChange={handleChange(field.name)}
+              />
+            );
+          })}
         </div>
       </form>
     </Modal>

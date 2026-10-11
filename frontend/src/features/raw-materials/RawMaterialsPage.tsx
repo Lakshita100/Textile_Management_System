@@ -331,6 +331,7 @@ export default function RawMaterialsPage({ defaultSection = 'inventory', hideTab
         mode={yarnForm.mode}
         item={editItem}
         items={items}
+        suppliers={suppliers}
         onClose={closeYarnForm}
         onSubmit={handleSubmitYarn}
         onAdjustStock={(yarnId, action, quantity, note) => adjustStock({ yarnId, action, quantity, note })}

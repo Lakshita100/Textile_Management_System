@@ -1,4 +1,4 @@
-import type { InventoryStage, StockStatus, YarnCategory, YarnItem, YarnRow } from './types';
+import { INVENTORY_STAGES, YARN_CATEGORIES, type InventoryStage, type StockStatus, type YarnCategory, type YarnItem, type YarnRow } from './types';
 
 /** Rows shown per page in the inventory table. */
 export const PAGE_SIZE = 10;
@@ -57,14 +57,23 @@ export function resolveStockStatus(currentStock: number, minimumStockLevel: numb
   return 'In Stock';
 }
 
-/** Format numbers in compact 'k' notation (e.g. 12.35k, 10k, 480). */
+/** Format numbers in compact 'k', 'M', 'B' notation (e.g. 12.35k, 3.56M, 1.2B). */
 export function formatKNumber(value: number): string {
-  if (value >= 1000) {
-    const k = value / 1000;
-    const formatted = k % 1 === 0 ? k.toFixed(0) : k.toFixed(2).replace(/\.?0+$/, '');
-    return `${formatted}k`;
+  if (value === undefined || value === null || isNaN(value)) return '0';
+  const absVal = Math.abs(value);
+  if (absVal >= 1_000_000_000) {
+    const b = value / 1_000_000_000;
+    return `${b % 1 === 0 ? b.toFixed(0) : b.toFixed(2).replace(/\.?0+$/, '')}B`;
   }
-  return value.toLocaleString('en-US');
+  if (absVal >= 1_000_000) {
+    const m = value / 1_000_000;
+    return `${m % 1 === 0 ? m.toFixed(0) : m.toFixed(2).replace(/\.?0+$/, '')}M`;
+  }
+  if (absVal >= 1_000) {
+    const k = value / 1_000;
+    return `${k % 1 === 0 ? k.toFixed(0) : k.toFixed(2).replace(/\.?0+$/, '')}k`;
+  }
+  return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 /** Server-side inventory summary (SQL aggregates — never computed in the browser). */
@@ -130,13 +139,13 @@ export const YARN_FIELD_LABELS: Record<keyof YarnFormValues, string> = {
   imageFile: 'Yarn image',
   yarnName: 'Yarn name',
   productCode: 'Product code',
-  category: 'Category',
+  category: 'Yarn Type / Category',
   materialComposition: 'Material / composition',
   colourShade: 'Colour / shade',
   denierSpecification: 'Denier / specification',
-  currentStock: 'Current stock',
-  unit: 'Unit',
-  unitCost: 'Unit cost',
+  currentStock: 'Current stock quantity',
+  unit: 'Stock unit',
+  unitCost: 'Unit cost (₹)',
   supplierSource: 'Supplier / source',
   minimumStockLevel: 'Minimum stock level',
   storageLocation: 'Storage location',
@@ -147,39 +156,31 @@ export const YARN_FIELD_LABELS: Record<keyof YarnFormValues, string> = {
 export const REQUIRED_YARN_FIELDS: (keyof YarnFormValues)[] = [
   'yarnId',
   'yarnName',
-  'productCode',
   'category',
-  'materialComposition',
-  'colourShade',
-  'denierSpecification',
   'currentStock',
-  'unit',
   'unitCost',
-  'supplierSource',
-  'minimumStockLevel',
-  'storageLocation',
-  'batchNumber',
-  'inventoryStage',
 ];
 
 export function createEmptyYarnForm(items: YarnItem[] = []): YarnFormValues {
+  const nextId = items.length > 0 ? nextYarnId(items) : 'YRN-00001';
+  const numPart = nextId.replace('YRN-', '');
   return {
-    yarnId: items.length > 0 ? nextYarnId(items) : 'YRN-00001',
+    yarnId: nextId,
     imageFile: DEFAULT_YARN_IMAGE,
     yarnName: '',
-    productCode: '',
-    category: '',
-    materialComposition: '',
-    colourShade: '',
-    denierSpecification: '',
-    currentStock: '',
+    productCode: `PC-${numPart}`,
+    category: YARN_CATEGORIES[0],
+    materialComposition: 'Polyester / Cotton Blend',
+    colourShade: 'Natural / Raw',
+    denierSpecification: '150D/48F',
+    currentStock: '0',
     unit: 'kg',
-    unitCost: '',
+    unitCost: '0.00',
     supplierSource: '',
     minimumStockLevel: '100',
-    storageLocation: '',
-    batchNumber: '',
-    inventoryStage: '',
+    storageLocation: 'Warehouse A',
+    batchNumber: `B-${numPart}`,
+    inventoryStage: INVENTORY_STAGES[0],
   };
 }
 
@@ -215,14 +216,14 @@ export function validateYarnForm(
   const errors: YarnFormErrors = {};
 
   for (const field of REQUIRED_YARN_FIELDS) {
-    if (values[field].trim() === '') {
+    if (!values[field] || values[field].trim() === '') {
       errors[field] = `${YARN_FIELD_LABELS[field]} is required`;
     }
   }
 
   const numericFields: (keyof YarnFormValues)[] = ['currentStock', 'unitCost', 'minimumStockLevel'];
   for (const field of numericFields) {
-    const raw = values[field].trim();
+    const raw = (values[field] ?? '').trim();
     if (raw === '' || errors[field]) {
       continue;
     }
@@ -234,7 +235,7 @@ export function validateYarnForm(
     }
   }
 
-  const yarnId = values.yarnId.trim();
+  const yarnId = (values.yarnId ?? '').trim();
   if (!errors.yarnId) {
     const duplicate = existingItems.some(
       (item) => item.yarnId.toLowerCase() === yarnId.toLowerCase() && item.yarnId !== editingYarnId,
@@ -249,23 +250,25 @@ export function validateYarnForm(
 
 /** Builds a typed row from validated form values. Only call after `validateYarnForm` passes. */
 export function yarnFormToRow(values: YarnFormValues, currentStockOverride?: number): YarnRow {
+  const yarnId = values.yarnId.trim();
+  const numPart = yarnId.replace(/^YRN-?/i, '');
   return {
-    yarnId: values.yarnId.trim(),
+    yarnId,
     imageFile: values.imageFile.trim() || DEFAULT_YARN_IMAGE,
     yarnName: values.yarnName.trim(),
-    productCode: values.productCode.trim(),
-    category: values.category.trim() as YarnCategory,
-    materialComposition: values.materialComposition.trim(),
-    colourShade: values.colourShade.trim(),
-    denierSpecification: values.denierSpecification.trim(),
-    currentStock: currentStockOverride ?? Number(values.currentStock),
-    unit: values.unit.trim(),
-    unitCost: Number(values.unitCost),
-    supplierSource: values.supplierSource.trim(),
-    minimumStockLevel: Number(values.minimumStockLevel),
-    storageLocation: values.storageLocation.trim(),
-    batchNumber: values.batchNumber.trim(),
-    inventoryStage: values.inventoryStage.trim() as InventoryStage,
+    productCode: values.productCode.trim() || `PC-${numPart || '100'}`,
+    category: (values.category.trim() || YARN_CATEGORIES[0]) as YarnCategory,
+    materialComposition: values.materialComposition.trim() || 'Polyester / Cotton Blend',
+    colourShade: values.colourShade.trim() || 'Natural / Raw',
+    denierSpecification: values.denierSpecification.trim() || '150D/48F',
+    currentStock: currentStockOverride ?? (Number(values.currentStock) || 0),
+    unit: values.unit.trim() || 'kg',
+    unitCost: Number(values.unitCost) || 0,
+    supplierSource: values.supplierSource.trim() || 'Direct Supplier',
+    minimumStockLevel: Number(values.minimumStockLevel) || 100,
+    storageLocation: values.storageLocation.trim() || 'Warehouse A',
+    batchNumber: values.batchNumber.trim() || `B-${numPart || '001'}`,
+    inventoryStage: (values.inventoryStage.trim() || INVENTORY_STAGES[0]) as InventoryStage,
   };
 }
 
